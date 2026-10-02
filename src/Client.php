@@ -28,7 +28,8 @@ final class Client
     /** The SDK version, sent in the User-Agent header. */
     public const VERSION = '0.2.1';
 
-    public const DEFAULT_BASE_URL = 'https://zazu.ma';
+    /** Production, Morocco. South Africa is https://za.manza.finance. */
+    public const DEFAULT_BASE_URL = 'https://ma.manza.finance';
     public const DEFAULT_TIMEOUT = 30.0;
 
     public readonly Resources\Accounts $accounts;
@@ -37,6 +38,7 @@ final class Client
     public readonly Resources\Customers $customers;
     public readonly Resources\Entity $entity;
     public readonly Resources\Invoices $invoices;
+    public readonly Resources\PayeeTrustRequests $payeeTrustRequests;
     public readonly Resources\PaymentLinks $paymentLinks;
     public readonly Resources\TransferDrafts $transferDrafts;
     public readonly Resources\WebhookEndpoints $webhookEndpoints;
@@ -48,7 +50,8 @@ final class Client
 
     /**
      * @param string|null $apiKey API key (default: the ZAZU_API_KEY env var). Required.
-     * @param string|null $baseUrl API base URL (default: ZAZU_BASE_URL or https://zazu.ma)
+     * @param string|null $baseUrl API base URL (default: ZAZU_BASE_URL or https://ma.manza.finance;
+     *   use https://za.manza.finance for South Africa)
      * @param string|null $apiVersion Pins the Zazu-Version request header (default: ZAZU_API_VERSION)
      * @param float $timeout Request timeout in seconds (ignored when $httpClient is supplied)
      * @param ClientInterface|null $httpClient Swaps the underlying Guzzle client
@@ -77,6 +80,7 @@ final class Client
         $this->customers = new Resources\Customers($this);
         $this->entity = new Resources\Entity($this);
         $this->invoices = new Resources\Invoices($this);
+        $this->payeeTrustRequests = new Resources\PayeeTrustRequests($this);
         $this->paymentLinks = new Resources\PaymentLinks($this);
         $this->transferDrafts = new Resources\TransferDrafts($this);
         $this->webhookEndpoints = new Resources\WebhookEndpoints($this);

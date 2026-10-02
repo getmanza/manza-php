@@ -29,6 +29,18 @@ final class ClientTest extends TestCase
         }
     }
 
+    public function testDefaultBaseUrlIsProductionMorocco(): void
+    {
+        $this->assertSame('https://ma.manza.finance', Client::DEFAULT_BASE_URL);
+    }
+
+    public function testExposesPayeeTrustRequests(): void
+    {
+        $client = new Client(apiKey: 'test', baseUrl: 'http://127.0.0.1:1');
+
+        $this->assertInstanceOf(\Zazu\Resources\PayeeTrustRequests::class, $client->payeeTrustRequests);
+    }
+
     public function testListLimitValidation(): void
     {
         $client = new Client(apiKey: 'test', baseUrl: 'http://127.0.0.1:1');

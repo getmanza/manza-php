@@ -11,16 +11,18 @@ use Psr\Http\Message\ResponseInterface;
  * `{ "error": { "type": ..., "message": ..., "param": ... } }`.
  *
  * Match on {@see ApiException::$kind} (`authentication`, `forbidden`,
- * `not_found`, `validation`, `rate_limit`, `server`, `api`) instead of
- * subclassing.
+ * `not_found`, `validation`, `conflict`, `rate_limit`, `server`, `api`)
+ * instead of subclassing. A `conflict` (409) carries {@see ApiException::$paymentId}
+ * for a duplicate transfer `client_reference`.
  */
 final class ApiException extends \RuntimeException
 {
     /**
-     * @param string $kind One of: authentication, forbidden, not_found, validation, rate_limit, server, api
+     * @param string $kind One of: authentication, forbidden, not_found, validation, conflict, rate_limit, server, api
      * @param string|null $type The API's error.type field
      * @param string|null $param The API's error.param field
      * @param int|null $retryAfter Seconds; only set for rate_limit (429)
+     * @param string|null $paymentId The API's error.payment_id: the draft that already holds a duplicate client_reference (409)
      * @param array<string, mixed> $body The full decoded error body
      */
     public function __construct(
@@ -32,6 +34,7 @@ final class ApiException extends \RuntimeException
         public readonly ?string $requestId,
         public readonly ?int $retryAfter,
         public readonly array $body,
+        public readonly ?string $paymentId = null,
     ) {
         parent::__construct($message);
     }
@@ -46,11 +49,13 @@ final class ApiException extends \RuntimeException
         $type = null;
         $message = null;
         $param = null;
+        $paymentId = null;
         $payload = $body['error'] ?? null;
         if (\is_array($payload)) {
             $type = \is_string($payload['type'] ?? null) ? $payload['type'] : null;
             $message = \is_string($payload['message'] ?? null) ? $payload['message'] : null;
             $param = \is_string($payload['param'] ?? null) ? $payload['param'] : null;
+            $paymentId = \is_string($payload['payment_id'] ?? null) ? $payload['payment_id'] : null;
         }
 
         $retryAfter = null;
@@ -58,7 +63,8 @@ final class ApiException extends \RuntimeException
             $status === 401 => 'authentication',
             $status === 403 => 'forbidden',
             $status === 404 => 'not_found',
-            $status === 422 => 'validation',
+            $status === 400, $status === 422 => 'validation',
+            $status === 409 => 'conflict',
             $status === 429 => 'rate_limit',
             $status >= 500 => 'server',
             default => 'api',
@@ -84,6 +90,7 @@ final class ApiException extends \RuntimeException
             requestId: $requestId !== '' ? $requestId : null,
             retryAfter: $retryAfter,
             body: $body,
+            paymentId: $paymentId,
         );
     }
 }
