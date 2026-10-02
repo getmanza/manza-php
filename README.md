@@ -70,3 +70,7 @@ vendor/bin/phpunit
 - [zazu-python](https://github.com/getzazu/zazu-python)
 - [zazu-go](https://github.com/getzazu/zazu-go)
 - [cli](https://github.com/getzazu/cli)
+
+## Releasing
+
+Maintainers: run `bin/release` from a clean, up-to-date `main` (`bin/release --help` for the options).

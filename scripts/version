@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# bin/release adapter: print the current version, or write a new one into every
+# tracked file that carries it (the Client::VERSION constant; Packagist reads
+# the version from the git tag, composer.json carries none).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if [ $# -eq 0 ]; then
+  sed -nE "s/^    public const VERSION = '([^']+)';\$/\1/p" src/Client.php
+  exit 0
+fi
+
+sed -i.bak -E "s/^    public const VERSION = '[^']+';\$/    public const VERSION = '$1';/" src/Client.php
+rm -f src/Client.php.bak
