@@ -38,6 +38,9 @@ final class Invoices extends AbstractResource
     /**
      * POST /api/invoices
      *
+     * `delivery_date` is Morocco only and absent from responses in other
+     * markets. `tax_rate` must be the issuer's rate or 0 (otherwise 422).
+     *
      * @param array<string, mixed> $attributes snake_case keys, exactly what the API accepts
      */
     public function create(array $attributes): Response

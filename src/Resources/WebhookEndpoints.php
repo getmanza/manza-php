@@ -42,6 +42,9 @@ final class WebhookEndpoints extends AbstractResource
     /**
      * PATCH /api/webhook_endpoints/:id
      *
+     * Changing `url` on the endpoint enrolled as transfer authorizer is
+     * rejected with a validation ApiException (422).
+     *
      * @param array<string, mixed> $attributes snake_case keys, exactly what the API accepts
      */
     public function update(string $id, array $attributes): Response
@@ -51,6 +54,9 @@ final class WebhookEndpoints extends AbstractResource
 
     /**
      * DELETE /api/webhook_endpoints/:id
+     *
+     * A soft delete (still 204). Rejected with a validation ApiException
+     * (422) on the enrolled transfer authorizer.
      */
     public function delete(string $id): Response
     {
@@ -67,6 +73,9 @@ final class WebhookEndpoints extends AbstractResource
 
     /**
      * POST /api/webhook_endpoints/:id/regenerate_secret
+     *
+     * Rejected with a validation ApiException (422) on the enrolled
+     * transfer authorizer.
      */
     public function regenerateSecret(string $id): Response
     {
