@@ -20,15 +20,20 @@ use Symfony\Component\Yaml\Yaml;
  * cassette tarball must replay the exact request shape.
  *
  * Matching is method + path+query + semantic JSON body (the host is
- * ignored — cassettes were recorded against staging). Unmatched requests
- * throw, failing the test.
+ * ignored — cassettes were recorded against ma.manza.dev). Unmatched
+ * requests throw, failing the test.
+ *
+ * The machine-authorization cassettes (`transfer_drafts/authorize*`)
+ * match the body with `signature` removed: the recorded signature is an
+ * HMAC over a real nonce and secret that replay cannot reproduce. Load
+ * those through {@see CassetteReplayHandler::clientIgnoringSignature()}.
  */
 final class CassetteReplayHandler
 {
-    /** @var list<array{method: string, uri: string, requestBody: string, status: int, responseBody: string}> */
+    /** @var list<array{method: string, uri: string, requestBody: string, status: int, responseBody: string, ignoreSignature: bool}> */
     private array $interactions = [];
 
-    private function __construct()
+    private function __construct(private readonly bool $ignoreSignature)
     {
     }
 
@@ -38,7 +43,24 @@ final class CassetteReplayHandler
      */
     public static function client(string ...$names): GuzzleClient
     {
-        $handler = new self();
+        return self::build(false, $names);
+    }
+
+    /**
+     * Like {@see client()}, but the request body is compared with its
+     * `signature` key removed. Only for the authorize cassettes.
+     */
+    public static function clientIgnoringSignature(string ...$names): GuzzleClient
+    {
+        return self::build(true, $names);
+    }
+
+    /**
+     * @param list<string> $names
+     */
+    private static function build(bool $ignoreSignature, array $names): GuzzleClient
+    {
+        $handler = new self($ignoreSignature);
         foreach ($names as $name) {
             $handler->loadCassette($name);
         }
@@ -87,6 +109,7 @@ final class CassetteReplayHandler
                 'requestBody' => self::bodyString($interaction['request']['body'] ?? []),
                 'status' => (int) ($interaction['response']['status']['code'] ?? 200),
                 'responseBody' => self::bodyString($interaction['response']['body'] ?? []),
+                'ignoreSignature' => $this->ignoreSignature,
             ];
         }
     }
@@ -113,7 +136,7 @@ final class CassetteReplayHandler
     }
 
     /**
-     * @param array{method: string, uri: string, requestBody: string, status: int, responseBody: string} $interaction
+     * @param array{method: string, uri: string, requestBody: string, status: int, responseBody: string, ignoreSignature: bool} $interaction
      */
     private function matches(array $interaction, RequestInterface $request, string $actualBody): bool
     {
@@ -135,7 +158,29 @@ final class CassetteReplayHandler
             return false;
         }
 
+        if ($interaction['ignoreSignature']) {
+            return self::jsonEqual(
+                self::withoutSignature($interaction['requestBody']),
+                self::withoutSignature($actualBody),
+            );
+        }
+
         return self::jsonEqual($interaction['requestBody'], $actualBody);
+    }
+
+    /**
+     * Re-encodes a JSON object body without its `signature` key; any
+     * other body is returned untouched.
+     */
+    private static function withoutSignature(string $body): string
+    {
+        $decoded = json_decode($body, true);
+        if (!\is_array($decoded) || array_is_list($decoded)) {
+            return $body;
+        }
+        unset($decoded['signature']);
+
+        return json_encode($decoded, \JSON_THROW_ON_ERROR);
     }
 
     /**

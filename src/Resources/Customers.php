@@ -36,6 +36,11 @@ final class Customers extends AbstractResource
     /**
      * POST /api/customers
      *
+     * Keys: person_name, company_name, email, phone, registration_number,
+     * vat_number, billing_address (array with street/city/postal_code/
+     * country/country_code). Morocco only: tax_id, ice_number. These keys
+     * are absent from responses in other markets.
+     *
      * @param array<string, mixed> $attributes snake_case keys, exactly what the API accepts
      */
     public function create(array $attributes): Response

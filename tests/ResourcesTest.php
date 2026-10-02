@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace Zazu\Tests;
 
+use GuzzleHttp\Client as GuzzleClient;
 use PHPUnit\Framework\TestCase;
 use Zazu\Client;
+use Zazu\Exception\ApiException;
+use Zazu\Page;
+use Zazu\TransferAuthorization;
 
 /**
  * Mirror of zazu-ruby's spec/zazu/resources/*_spec.rb (and zazu-go's
@@ -14,12 +18,25 @@ use Zazu\Client;
  */
 final class ResourcesTest extends TestCase
 {
+    private const REPLAY_BASE_URL = 'https://ma.manza.dev';
+
     private function replayClient(string ...$cassettes): Client
+    {
+        return $this->clientWith(CassetteReplayHandler::client(...$cassettes));
+    }
+
+    /** For the authorize cassettes: bodies match with `signature` removed. */
+    private function signatureReplayClient(string $cassette): Client
+    {
+        return $this->clientWith(CassetteReplayHandler::clientIgnoringSignature($cassette));
+    }
+
+    private function clientWith(GuzzleClient $http): Client
     {
         return new Client(
             apiKey: 'test-api-key-for-replay',
-            baseUrl: 'http://cassette-replay.test',
-            httpClient: CassetteReplayHandler::client(...$cassettes),
+            baseUrl: self::REPLAY_BASE_URL,
+            httpClient: $http,
         );
     }
 
@@ -106,11 +123,26 @@ final class ResourcesTest extends TestCase
 
     public function testCheckoutSessions(): void
     {
-        $client = $this->replayClient('checkout_sessions/get');
+        $client = $this->replayClient('checkout_sessions/create', 'checkout_sessions/get');
+
+        $created = $client->checkoutSessions->create([
+            'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+            'amount' => '100.00',
+            'success_url' => 'https://example.com/zazu-fixture-success?session_id={CHECKOUT_SESSION_ID}',
+            'cancel_url' => 'https://example.com/zazu-fixture-cancel',
+            'description' => 'Created by zazu-ruby fixture spec',
+            'customer_email' => 'fixture@example.com',
+            'metadata' => ['order_id' => 'ORD-FIXTURE'],
+        ]);
+        $this->assertSame(201, $created->status);
+        $this->assertIsString($created->body['id'] ?? null, 'expected string id');
+        $this->assertIsString($created->body['url'] ?? null, 'expected string url');
+        $this->assertSame('open', $created->body['status'] ?? null);
 
         $resp = $client->checkoutSessions->get(FixtureIds::id('ZAZU_FIXTURE_CHECKOUT_SESSION_ID'));
 
         $this->assertIsString($resp->body['id'] ?? null, 'expected string id');
+        $this->assertIsString($resp->body['status'] ?? null, 'expected string status');
     }
 
     public function testWebhookEndpoints(): void
@@ -123,27 +155,142 @@ final class ResourcesTest extends TestCase
         $this->addToAssertionCount(1); // both calls matched their cassette interactions
     }
 
-    public function testTransferDrafts(): void
+    public function testTransferDraftsCreateCarriesClientReference(): void
     {
-        $client = $this->replayClient('transfer_drafts/create', 'transfer_drafts/get');
+        $client = $this->replayClient('transfer_drafts/create');
 
         $resp = $client->transferDrafts->create([
             'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
             'beneficiary_id' => FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'),
             'amount' => '150.00',
             'payment_reference' => 'SDK fixture',
+            'client_reference' => FixtureIds::id('ZAZU_FIXTURE_CLIENT_REFERENCE'),
         ]);
+
         $this->assertSame(201, $resp->status);
         $this->assertSame(
             'requested',
             $resp->body['status'] ?? null,
             'expected requested status (awaiting in-app approval)',
         );
+        $this->assertSame(
+            FixtureIds::id('ZAZU_FIXTURE_CLIENT_REFERENCE'),
+            $resp->body['client_reference'] ?? null,
+        );
+        $this->assertArrayHasKey('authorization', $resp->body);
         $this->assertArrayHasKey('transfer', $resp->body);
         $this->assertNull($resp->body['transfer'], 'expected null transfer before approval');
+    }
+
+    public function testTransferDraftsCreateDuplicateRaisesConflict(): void
+    {
+        $client = $this->replayClient('transfer_drafts/create_duplicate');
+
+        try {
+            $client->transferDrafts->create([
+                'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+                'beneficiary_id' => FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'),
+                'amount' => '10.00',
+                'client_reference' => FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+            ]);
+            $this->fail('expected a conflict ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertSame('conflict', $e->kind);
+            $this->assertSame('duplicate_client_reference', $e->type);
+            $this->assertSame('client_reference', $e->param);
+            $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID'), $e->paymentId);
+        }
+    }
+
+    public function testTransferDraftsGet(): void
+    {
+        $client = $this->replayClient('transfer_drafts/get');
 
         $got = $client->transferDrafts->get(FixtureIds::id('ZAZU_FIXTURE_TRANSFER_DRAFT_ID'));
-        $this->assertIsString($got->body['status'] ?? null, 'expected string status');
+
+        $this->assertIsString($got->body['id'] ?? null, 'expected string id');
+        $this->assertArrayHasKey('status', $got->body);
+        $this->assertArrayHasKey('transfer', $got->body);
+    }
+
+    public function testTransferDraftsAuthorizeWithBadSignature(): void
+    {
+        $client = $this->signatureReplayClient('transfer_drafts/authorize_bad_signature');
+
+        try {
+            $client->transferDrafts->authorize(
+                FixtureIds::id('ZAZU_FIXTURE_BAD_SIGNATURE_DRAFT_ID'),
+                FixtureIds::id('ZAZU_FIXTURE_BAD_SIGNATURE_AUTHORIZATION_ID'),
+                str_repeat('0', 64),
+            );
+            $this->fail('expected a validation ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertSame('validation', $e->kind);
+            $this->assertSame('invalid_signature', $e->type);
+        }
+    }
+
+    public function testTransferDraftsAuthorizeWithTheCreatingKey(): void
+    {
+        $client = $this->signatureReplayClient('transfer_drafts/authorize_same_key');
+
+        try {
+            $client->transferDrafts->authorize(
+                FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID'),
+                FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
+                str_repeat('0', 64),
+            );
+            $this->fail('expected a forbidden ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(403, $e->status);
+            $this->assertSame('forbidden', $e->kind);
+            $this->assertSame('same_key_forbidden', $e->type);
+        }
+    }
+
+    public function testTransferDraftsAuthorize(): void
+    {
+        $client = $this->signatureReplayClient('transfer_drafts/authorize');
+        $draftId = FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID');
+        $input = TransferAuthorization::signatureInput(
+            paymentId: $draftId,
+            nonce: FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_NONCE'),
+            amount: '10.0',
+            currencyCode: 'MAD',
+            accountId: FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+            payee: TransferAuthorization::payeeFor(
+                externalAccountId: FixtureIds::id('ZAZU_FIXTURE_TRUSTED_EXTERNAL_ACCOUNT_ID'),
+            ),
+            clientReference: FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+        );
+
+        $resp = $client->transferDrafts->authorize(
+            $draftId,
+            FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
+            TransferAuthorization::sign('test-secret-only-used-during-recording', $input),
+        );
+
+        $this->assertSame(200, $resp->status);
+        $this->assertSame($draftId, $resp->body['id'] ?? null);
+        $this->assertSame('authorized', $resp->body['authorization']['status'] ?? null);
+    }
+
+    public function testTransferDraftsDecline(): void
+    {
+        $client = $this->replayClient('transfer_drafts/decline');
+
+        $resp = $client->transferDrafts->decline(
+            FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_DRAFT_ID'),
+            FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_AUTHORIZATION_ID'),
+            'SDK fixture',
+        );
+
+        $this->assertSame(200, $resp->status);
+        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_AUTHORIZATION_ID'), $resp->body['id'] ?? null);
+        $this->assertSame('declined', $resp->body['status'] ?? null);
+        $this->assertIsString($resp->body['declined_at'] ?? null);
     }
 
     public function testBeneficiaries(): void
@@ -159,5 +306,91 @@ final class ResourcesTest extends TestCase
 
         $resp = $client->beneficiaries->get(FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'));
         $this->assertIsString($resp->body['id'] ?? null, 'expected string id');
+        $this->assertIsArray($resp->body['external_accounts'] ?? null);
+    }
+
+    public function testBeneficiariesCreate(): void
+    {
+        $client = $this->replayClient('beneficiaries/create');
+
+        $resp = $client->beneficiaries->create([
+            'beneficiary_type' => 'business',
+            'company_name' => 'Zazu Fixture Beneficiary - spec (zazu-ruby-fixture)',
+            'email' => 'fixture-beneficiary-spec@example.com',
+        ]);
+
+        $this->assertSame(201, $resp->status);
+        $this->assertSame('business', $resp->body['beneficiary_type'] ?? null);
+        $this->assertSame([], $resp->body['external_accounts'] ?? null);
+    }
+
+    public function testBeneficiariesListExternalAccounts(): void
+    {
+        $client = $this->replayClient('beneficiaries/list_external_accounts');
+
+        $page = $client->beneficiaries->listExternalAccounts(
+            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
+        );
+
+        $this->assertInstanceOf(Page::class, $page);
+        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'), $page->data[0]['id'] ?? null);
+        $this->assertIsString($page->data[0]['account_number'] ?? null);
+        $this->assertFalse($page->hasMore);
+        $this->assertNull($page->next());
+    }
+
+    public function testBeneficiariesGetExternalAccount(): void
+    {
+        $client = $this->replayClient('beneficiaries/get_external_account');
+
+        $resp = $client->beneficiaries->getExternalAccount(
+            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
+            FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'),
+        );
+
+        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'), $resp->body['id'] ?? null);
+        $this->assertArrayHasKey('default', $resp->body);
+    }
+
+    public function testBeneficiariesCreateExternalAccount(): void
+    {
+        $client = $this->replayClient('beneficiaries/create_external_account');
+
+        $resp = $client->beneficiaries->createExternalAccount(
+            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
+            [
+                'account_number' => FixtureIds::id('ZAZU_FIXTURE_NEW_ACCOUNT_NUMBER'),
+                'name' => 'Fixture Secondary Account',
+            ],
+        );
+
+        $this->assertSame(201, $resp->status);
+        $this->assertSame('Fixture Secondary Account', $resp->body['name'] ?? null);
+        $this->assertFalse($resp->body['default'] ?? null);
+    }
+
+    public function testPayeeTrustRequestsCreate(): void
+    {
+        $client = $this->replayClient('payee_trust_requests/create');
+
+        $resp = $client->payeeTrustRequests->create([FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID')]);
+
+        $this->assertSame(201, $resp->status);
+        $this->assertSame('pending', $resp->body['status'] ?? null);
+        $this->assertSame(
+            [FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID')],
+            $resp->body['external_account_ids'] ?? null,
+        );
+    }
+
+    public function testPayeeTrustRequestsGet(): void
+    {
+        $client = $this->replayClient('payee_trust_requests/get');
+
+        $resp = $client->payeeTrustRequests->get(FixtureIds::id('ZAZU_FIXTURE_PAYEE_TRUST_REQUEST_ID'));
+
+        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_PAYEE_TRUST_REQUEST_ID'), $resp->body['id'] ?? null);
+        $this->assertArrayHasKey('resolved_at', $resp->body);
+        $this->assertNull($resp->body['resolved_at']);
     }
 }

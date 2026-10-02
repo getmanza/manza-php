@@ -38,6 +38,9 @@ final class PaymentLinks extends AbstractResource
     /**
      * POST /api/payment_links
      *
+     * Optional billing keys: collect_billing_address, billing_address.
+     * Responses carry `settled_at`; status includes `clearing`.
+     *
      * @param array<string, mixed> $attributes snake_case keys, exactly what the API accepts
      */
     public function create(array $attributes): Response
