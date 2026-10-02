@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Downloads the cassette tarball published by zazu-ruby's release workflow.
+# Downloads the cassette tarball published by manza-ruby's release workflow.
 # CI calls this before running tests so we don't have to commit cassettes
 # into both repos.
 #
-#   scripts/fetch-cassettes.sh            # latest release
-#   scripts/fetch-cassettes.sh v0.2.1     # specific tag
+#   scripts/fetch-cassettes.sh            # the pinned tag (v1.0.0)
+#   scripts/fetch-cassettes.sh v1.1.0     # specific tag, e.g. to try a newer release
+#   scripts/fetch-cassettes.sh latest     # newest v* tag
 #
 # Cassettes land under tests/fixtures/cassettes/.
 set -euo pipefail
 
-REPO="getzazu/zazu-ruby"
+REPO="getmanza/manza-ruby"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$ROOT/tests/fixtures/cassettes"
 
-TAG="${1:-}"
+TAG="${1:-v1.0.0}"
+[[ "$TAG" == "latest" ]] && TAG=""
 AUTH=()
 if [[ -n "${GH_TOKEN:-}" ]]; then
   AUTH=(-H "Authorization: Bearer $GH_TOKEN")

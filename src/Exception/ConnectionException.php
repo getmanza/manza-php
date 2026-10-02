@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Exception;
+namespace Manza\Exception;
 
 /**
  * Wraps transport-level failures (timeouts, DNS, connection refused).

@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Tests;
+namespace Manza\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Zazu\TransferAuthorization;
+use Manza\TransferAuthorization;
 
 /**
  * Fixed test vector, shared by every SDK in the family (mirror of
- * zazu-ruby's spec/zazu/transfer_authorization_spec.rb). Each SDK's
+ * manza-ruby's spec/manza/transfer_authorization_spec.rb). Each SDK's
  * signer must produce exactly these hex digests from these inputs.
  */
 final class TransferAuthorizationTest extends TestCase

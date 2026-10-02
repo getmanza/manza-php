@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zazu;
+namespace Manza;
 
 /**
  * One page of a cursor-paginated list endpoint:

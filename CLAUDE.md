@@ -1,97 +1,97 @@
-# zazu-php
+# manza-php
 
-PHP SDK for the Zazu API (the Manza API). It replays the cassettes that **zazu-ruby**, the reference implementation, records and ships on each release; it never talks to a live API in tests. Same interactions, same assertions as every other SDK in the family.
+PHP SDK for the Manza API. It replays the cassettes that **manza-ruby**, the reference implementation, records and ships on each release; it never talks to a live API in tests. Same interactions, same assertions as every other SDK in the family.
 
 ## Stack
 
 | Concern | Tool | Notes |
 |---|---|---|
 | Language | PHP ≥ 8.2 (`composer.json`) | CI runs a single version, 8.3 (`ci.yml`); there is no version matrix |
-| HTTP | Guzzle ^7.8 | `Zazu\Client::request()`; swap via the `httpClient` constructor argument |
+| HTTP | Guzzle ^7.8 | `Manza\Client::request()`; swap via the `httpClient` constructor argument |
 | Test runner | PHPUnit ^11 | `phpunit.xml.dist`, `failOnRisky` + `failOnWarning` |
-| Cassette replay (tests) | `tests/CassetteReplayHandler.php` + `symfony/yaml` | Guzzle handler reading zazu-ruby's VCR YAML |
+| Cassette replay (tests) | `tests/CassetteReplayHandler.php` + `symfony/yaml` | Guzzle handler reading manza-ruby's VCR YAML |
 | Lint / format / typecheck | none configured | No php-cs-fixer, phpstan or psalm; `composer validate --strict` is the only static gate |
-| Package registry | Packagist (`getzazu/zazu-php`) | Reads git tags via the GitHub hook; no OIDC, no publish token |
-| Release | `bin/release` | zazu SDK release kit; repo-specific bits in `scripts/version` + `scripts/release-check` |
+| Package registry | Packagist (`manza/manza-php`) | Reads git tags via the GitHub hook; no OIDC, no publish token |
+| Release | `bin/release` | manza SDK release kit; repo-specific bits in `scripts/version` + `scripts/release-check` |
 
 ## Public API surface
 
 ```php
-use Zazu\Client;
-use Zazu\TransferAuthorization;
-use Zazu\Exception\ApiException;
+use Manza\Client;
+use Manza\TransferAuthorization;
+use Manza\Exception\ApiException;
 
-$zazu = new Client(apiKey: 'sk_live_...');   // or ZAZU_API_KEY
+$manza = new Client(apiKey: 'sk_live_...');   // or MANZA_API_KEY
 
-$zazu->entity->get();
-$zazu->accounts->list();                     // returns Zazu\Page; ->next() for more
-$zazu->beneficiaries->create([...]);
-$zazu->beneficiaries->listExternalAccounts($beneficiaryId);
-$zazu->beneficiaries->getExternalAccount($beneficiaryId, $externalAccountId);
-$zazu->beneficiaries->createExternalAccount($beneficiaryId, [...]);
-$zazu->payeeTrustRequests->create([$externalAccountId]);
-$zazu->payeeTrustRequests->get($id);
-$zazu->transferDrafts->create([... 'client_reference' => 'po_1']);
+$manza->entity->get();
+$manza->accounts->list();                     // returns Manza\Page; ->next() for more
+$manza->beneficiaries->create([...]);
+$manza->beneficiaries->listExternalAccounts($beneficiaryId);
+$manza->beneficiaries->getExternalAccount($beneficiaryId, $externalAccountId);
+$manza->beneficiaries->createExternalAccount($beneficiaryId, [...]);
+$manza->payeeTrustRequests->create([$externalAccountId]);
+$manza->payeeTrustRequests->get($id);
+$manza->transferDrafts->create([... 'client_reference' => 'po_1']);
 
 // Machine authorization: sign from your own record, never from the server's signature_input
 $input = TransferAuthorization::signatureInput(paymentId: ..., nonce: ..., amount: ..., currencyCode: ..., accountId: ...,
     payee: TransferAuthorization::payeeFor(externalAccountId: ...), clientReference: ...);
 $signature = TransferAuthorization::sign($secret, $input);   // lowercase hex HMAC-SHA256
-$zazu->transferDrafts->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
-$zazu->transferDrafts->decline($draftId, $authorizationId, 'reason');      // reason optional
+$manza->transferDrafts->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
+$manza->transferDrafts->decline($draftId, $authorizationId, 'reason');      // reason optional
 
-try { $zazu->transferDrafts->create([...]); }
+try { $manza->transferDrafts->create([...]); }
 catch (ApiException $e) { if ($e->kind === 'conflict') { $e->paymentId; } }
 ```
 
 Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity`, `invoices`, `payeeTrustRequests`, `paymentLinks`, `transferDrafts`, `webhookEndpoints`.
 
-- `Zazu\Page`: cursor-based pagination (`data`, `hasMore`, `nextCursor`, `next()`), hard cap of 100 per page (`Page::MAX_PER_PAGE`)
-- Errors: **one** class, `Zazu\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
+- `Manza\Page`: cursor-based pagination (`data`, `hasMore`, `nextCursor`, `next()`), hard cap of 100 per page (`Page::MAX_PER_PAGE`)
+- Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
 - Snake-case wire format: responses are associative arrays with the API's keys, no typed models. **No auto-camelCasing.**
 
 ## How to work in this codebase
 
 1. **Tests come first.** Every change to `src/` ships with a test. Cassette-replay tests are the contract; they enforce the same wire format across Ruby, TS, PHP and the rest.
-2. **Use the SDK's primitives.** `Zazu\Page`, `ApiException::$kind`, `Client::encodePath()` for URL construction, `Client::request()`/`listPage()` for HTTP, `FixtureIds::id()` in tests. Don't hand-roll Guzzle calls or string-interpolate paths.
+2. **Use the SDK's primitives.** `Manza\Page`, `ApiException::$kind`, `Client::encodePath()` for URL construction, `Client::request()`/`listPage()` for HTTP, `FixtureIds::id()` in tests. Don't hand-roll Guzzle calls or string-interpolate paths.
 3. **Snake-case stays.** Response keys are wire format. We don't camelCase them.
 4. **Keep `composer validate --strict` and PHPUnit green.** There is no linter; match the surrounding style (`declare(strict_types=1)`, readonly properties, named arguments) and don't add suppressions.
 
 ## Critical rules
 
-- **Never call a live Zazu/Manza API** from tests, scripts or Claude sessions. Tests replay zazu-ruby's cassettes only. Live staging calls create real transfers and approval requests for the team. Only zazu-ruby records cassettes.
+- **Never call a live Manza API** from tests, scripts or Claude sessions. Tests replay manza-ruby's cassettes only. Live staging calls create real transfers and approval requests for the team. Only manza-ruby records cassettes.
 - **Cassette contract.**
-  - Cassettes come from the newest zazu-ruby `v*` release (`cassettes-vX.Y.Z.tar.gz`) via `scripts/fetch-cassettes.sh`; they land in `tests/fixtures/cassettes/` (git-ignored).
+  - Cassettes come from the manza-ruby release pinned in `scripts/fetch-cassettes.sh` (`v1.0.0`; `cassettes-vX.Y.Z.tar.gz`; bump the pin deliberately, `latest` resolves the newest tag); they land in `tests/fixtures/cassettes/` (git-ignored).
   - They are recorded against `https://ma.manza.dev`; the replay handler ignores the host.
   - Load one cassette per test: `transfer_drafts/authorize` vs `authorize_same_key` (and `authorize_bad_signature`), and `create` vs `create_duplicate`, share method + URI, so loading both makes the first one win.
   - The three authorize cassettes match the body minus `signature` (`CassetteReplayHandler::clientIgnoringSignature()`).
   - Every other cassette matches method, path, query (key order ignored) and **semantic JSON body** (decoded, string keys sorted, list order kept; non-JSON bodies compare byte for byte).
   - Cassette responses carry no `Content-Length`; the handler synthesises a response with only `Content-Type`.
-  - `tests/FixtureIds.php` must stay identical to zazu-ruby's `spec/support/fixture_ids.rb` (same env var names, same placeholders).
-- **Hosts.** Default `https://ma.manza.finance` (Morocco), South Africa `https://za.manza.finance`, staging and cassettes `https://ma.manza.dev`. Env var names stay `ZAZU_*` and the namespace stays `Zazu` until the rename plan (zazu-ruby `docs/plans/2026-10-manza-rename.md`).
-- **The error model is shared across the SDK family.** Adding an error kind means coordinating zazu-ruby and zazu-ts at minimum. The tenth is the conflict (409), kind `conflict`.
-- **Signer.** `TransferAuthorization` must keep reproducing the two fixed vectors in `tests/TransferAuthorizationTest.php` (mirrors zazu-ruby's `spec/zazu/transfer_authorization_spec.rb`). Never sign the server's `signature_input` blindly: build it from your own record of the draft.
-- **Release.** `bin/release` is byte-identical across the SDK repos and never edited in place. Repo-specific logic lives in `scripts/version` (reads/writes `Client::VERSION`) and `scripts/release-check` (fetch cassettes, composer validate, install, phpunit). `release.yml` fails the release unless the tag equals `Client::VERSION`. Packagist has no trusted publishing and this repo holds no secret: the package syncs from GitHub tags, so the Packagist repository URL must point at `getmanza/zazu-php`. Verify it at https://packagist.org/packages/getzazu/zazu-php if versions stop appearing.
-- **The repo moved from `getzazu` to `getmanza`.** Remotes and URLs must say `getmanza`. (Known leftovers: `composer.json` still names `getzazu/zazu-php` and its homepage, and `scripts/fetch-cassettes.sh` points at `getzazu/zazu-ruby`; GitHub redirects work, but don't spread the old org further.)
+  - `tests/FixtureIds.php` must stay identical to manza-ruby's `spec/support/fixture_ids.rb` (same env var names, same placeholders).
+- **Hosts.** Default `https://ma.manza.finance` (Morocco), South Africa `https://za.manza.finance`, staging and cassettes `https://ma.manza.dev`. Env vars are `MANZA_API_KEY`, `MANZA_BASE_URL`, `MANZA_API_VERSION`; the `ZAZU_*` names are read as a deprecated fallback (one-time `E_USER_DEPRECATED` warning) for all of 1.x. Fixture env vars are `MANZA_FIXTURE_*` with no fallback.
+- **The error model is shared across the SDK family.** Adding an error kind means coordinating manza-ruby and manza-ts at minimum. The tenth is the conflict (409), kind `conflict`.
+- **Signer.** `TransferAuthorization` must keep reproducing the two fixed vectors in `tests/TransferAuthorizationTest.php` (mirrors manza-ruby's `spec/manza/transfer_authorization_spec.rb`). Never sign the server's `signature_input` blindly: build it from your own record of the draft.
+- **Release.** `bin/release` is byte-identical across the SDK repos and never edited in place. Repo-specific logic lives in `scripts/version` (reads/writes `Client::VERSION`) and `scripts/release-check` (fetch cassettes, composer validate, install, phpunit). `release.yml` fails the release unless the tag equals `Client::VERSION`. Packagist has no trusted publishing and this repo holds no secret: the package syncs from GitHub tags, so the Packagist repository URL must point at `getmanza/manza-php`. Verify it at https://packagist.org/packages/manza/manza-php if versions stop appearing.
+- **The repo moved from `getzazu` to `getmanza`, and from `zazu-php` to `manza-php`.** Remotes and URLs must say `getmanza/manza-php`; the Packagist package is `manza/manza-php` (the old `getzazu/zazu-php` is abandoned in favour of it). The old `Zazu\` namespace is gone; only the `ZAZU_*` env fallback remains.
 - **Snake-case wire format.** API request/response bodies use snake_case. Don't transform them.
 - **Never escape backticks in PR bodies.** With `<<'EOF'` (single-quoted heredoc) the shell passes everything through verbatim. See "PR descriptions" below.
 
 ## PR descriptions
 
-Write PR description bodies in plain Markdown. **Do not escape backticks** with `` \` `` — GitHub renders `` \` `` literally as a backslash followed by a backtick, producing output like `` \`Zazu\Page\` `` instead of the monospace `Zazu\Page` the reader expects.
+Write PR description bodies in plain Markdown. **Do not escape backticks** with `` \` `` — GitHub renders `` \` `` literally as a backslash followed by a backtick, producing output like `` \`Manza\Page\` `` instead of the monospace `Manza\Page` the reader expects.
 
 The usual cause is writing the description inside a bash heredoc (`gh pr create --body "$(cat <<'EOF' ... EOF)"`) and then reflexively escaping every backtick because of shell-quoting muscle memory. With `<<'EOF'` (single-quoted delimiter) the shell does NOT interpret anything inside the heredoc — backticks, dollars, and backslashes all pass through verbatim. So write them exactly as you want them rendered:
 
 ```bash
-# Good — renders as `Zazu\Page` in monospace
+# Good — renders as `Manza\Page` in monospace
 gh pr create --body "$(cat <<'EOF'
-Uses the `Zazu\Page` helper.
+Uses the `Manza\Page` helper.
 EOF
 )"
 
-# Bad — renders as \`Zazu\Page\` literally in the PR body
+# Bad — renders as \`Manza\Page\` literally in the PR body
 gh pr create --body "$(cat <<'EOF'
-Uses the \`Zazu\Page\` helper.
+Uses the \`Manza\Page\` helper.
 EOF
 )"
 ```
@@ -149,7 +149,7 @@ Commands are the ones in `.github/workflows/ci.yml`. CI uses PHP 8.3; local PHP 
 
 ```bash
 # One-time setup
-scripts/fetch-cassettes.sh        # latest zazu-ruby release; or scripts/fetch-cassettes.sh v0.3.0
+scripts/fetch-cassettes.sh        # the pinned manza-ruby release (v1.0.0); or scripts/fetch-cassettes.sh v1.1.0
 composer install --no-interaction --prefer-dist
 
 # Daily loop
@@ -184,17 +184,17 @@ These live in `.claude/commands/` and are available in any Claude Code session:
 
 ## Cross-SDK contract
 
-`zazu-ruby` is the reference implementation:
+`manza-ruby` is the reference implementation:
 
 - Records cassettes against `https://ma.manza.dev`
 - Ships them as a release tarball (`cassettes-vX.Y.Z.tar.gz`) on each version
-- All other SDKs (`zazu-ts`, `zazu-python`, `zazu-go`, this one, `zazu-crystal`, `zazu-elixir`, `zazu-rust`) replay these cassettes in their own test harness
+- All other SDKs (`manza-ts`, `manza-python`, `manza-go`, this one, `manza-crystal`, `manza-elixir`, `manza-rust`) replay these cassettes in their own test harness
 
-If the contract breaks (e.g., a new request shape), it's a coordinated change across at least two repos: zazu-ruby and zazu-php (and zazu-ts).
+If the contract breaks (e.g., a new request shape), it's a coordinated change across at least two repos: manza-ruby and manza-php (and manza-ts).
 
 ## Repository links
 
-- Ruby SDK (reference): https://github.com/getmanza/zazu-ruby
-- TypeScript SDK: https://github.com/getmanza/zazu-ts
-- This repo: https://github.com/getmanza/zazu-php
-- Packagist: https://packagist.org/packages/getzazu/zazu-php
+- Ruby SDK (reference): https://github.com/getmanza/manza-ruby
+- TypeScript SDK: https://github.com/getmanza/manza-ts
+- This repo: https://github.com/getmanza/manza-php
+- Packagist: https://packagist.org/packages/manza/manza-php

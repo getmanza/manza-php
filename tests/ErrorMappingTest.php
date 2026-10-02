@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Tests;
+namespace Manza\Tests;
 
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Handler\MockHandler;
@@ -10,11 +10,11 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use PHPUnit\Framework\TestCase;
-use Zazu\Client;
-use Zazu\Exception\ApiException;
+use Manza\Client;
+use Manza\Exception\ApiException;
 
 /**
- * Mirror of the "error mapping" and local-validation specs in zazu-ruby's
+ * Mirror of the "error mapping" and local-validation specs in manza-ruby's
  * client_spec.rb / transfer_drafts_spec.rb, run against a mock handler.
  */
 final class ErrorMappingTest extends TestCase

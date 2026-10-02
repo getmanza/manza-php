@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Zazu;
+namespace Manza;
 
 /**
  * A successful (2xx) API response.
  *
  * The body is returned as-is from the API — snake_case keys in an
  * associative array, no typed models. The same shape ships across every
- * Zazu SDK (Ruby, TypeScript, Python, Go, PHP, ...) so the cassette
+ * Manza SDK (Ruby, TypeScript, Python, Go, PHP, ...) so the cassette
  * contract is one-to-one.
  */
 final class Response

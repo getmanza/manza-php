@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Tests;
+namespace Manza\Tests;
 
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\HandlerStack;
@@ -14,7 +14,7 @@ use Symfony\Component\Yaml\Tag\TaggedValue;
 use Symfony\Component\Yaml\Yaml;
 
 /**
- * Reads VCR YAML cassettes (recorded by zazu-ruby) and replays them as a
+ * Reads VCR YAML cassettes (recorded by manza-ruby) and replays them as a
  * Guzzle handler, so identical interactions replay against this SDK. The
  * contract is enforced cross-language: every SDK that consumes the
  * cassette tarball must replay the exact request shape.
