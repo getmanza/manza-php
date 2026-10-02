@@ -26,7 +26,7 @@ use Zazu\Exception\ConnectionException;
 final class Client
 {
     /** The SDK version, sent in the User-Agent header. */
-    public const VERSION = '0.1.0';
+    public const VERSION = '0.2.1';
 
     public const DEFAULT_BASE_URL = 'https://zazu.ma';
     public const DEFAULT_TIMEOUT = 30.0;

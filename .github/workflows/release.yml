@@ -20,6 +20,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Verify tag matches Client::VERSION
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! grep -qx "    public const VERSION = '${TAG#v}';" src/Client.php; then
+            echo "::error::src/Client.php does not carry ${TAG#v} (bin/release writes it via scripts/version)"
+            exit 1
+          fi
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.3"
