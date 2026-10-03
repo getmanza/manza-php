@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Exception;
+namespace Manza\Exception;
 
 use Psr\Http\Message\ResponseInterface;
 
 /**
- * The API error envelope, mirroring the other Zazu SDKs' hierarchy:
+ * The API error envelope, mirroring the other Manza SDKs' hierarchy:
  * `{ "error": { "type": ..., "message": ..., "param": ... } }`.
  *
  * Match on {@see ApiException::$kind} (`authentication`, `forbidden`,

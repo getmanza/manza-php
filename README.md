@@ -1,19 +1,19 @@
-# zazu-php
+# manza-php
 
 PHP SDK for the [Manza](https://ma.manza.finance) API.
 
 ```bash
-composer require getzazu/zazu-php
+composer require manza/manza-php
 ```
 
 ```php
-use Zazu\Client;
+use Manza\Client;
 
-$client = new Client(apiKey: getenv('ZAZU_API_KEY'));
+$client = new Client(apiKey: getenv('MANZA_API_KEY'));
 
 // The base URL defaults to https://ma.manza.finance (Morocco). For South
 // Africa, point at https://za.manza.finance:
-$za = new Client(apiKey: getenv('ZAZU_API_KEY'), baseUrl: 'https://za.manza.finance');
+$za = new Client(apiKey: getenv('MANZA_API_KEY'), baseUrl: 'https://za.manza.finance');
 
 $entity = $client->entity->get();
 
@@ -48,7 +48,7 @@ $client->payeeTrustRequests->get($trustRequestId);
 A draft inside your entity's authorization envelope (trusted payee, within limits) is sent to your enrolled authorizer endpoint as a `payment.authorization_requested` webhook carrying an `authorization.id` and a one-time `nonce`. Sign the draft from **your own record** of it with the endpoint's signing secret, and authorize it with a **different API key** from the one that created it (the creating key gets 403 `same_key_forbidden`):
 
 ```php
-use Zazu\TransferAuthorization;
+use Manza\TransferAuthorization;
 
 $input = TransferAuthorization::signatureInput(
     paymentId: $draft['id'],
@@ -61,41 +61,51 @@ $input = TransferAuthorization::signatureInput(
 );
 $signature = TransferAuthorization::sign($signingSecret, $input);
 
-$authorizer = new Client(apiKey: getenv('ZAZU_AUTHORIZER_API_KEY'));
+$authorizer = new Client(apiKey: getenv('MANZA_AUTHORIZER_API_KEY'));
 $authorizer->transferDrafts->authorize($draft['id'], $webhook['data']['authorization']['id'], $signature);
 $authorizer->transferDrafts->decline($draft['id'], $authorizationId, 'Not ours'); // reason is optional
 ```
 
 A blank signature is refused locally with an `\InvalidArgumentException`, because the API counts a missing one as a failed attempt. A wrong signature throws an `ApiException` of kind `validation` (`type` `invalid_signature`). Five on one challenge send the draft to your in-app approvers; five in a row suspend the authorizer.
 
+## Configuration
+
+| Env var | Meaning |
+|---|---|
+| `MANZA_API_KEY` | API key, used when `apiKey` is not passed |
+| `MANZA_BASE_URL` | Base URL (default `https://ma.manza.finance`) |
+| `MANZA_API_VERSION` | Pins the `Manza-Version` request header |
+
+The legacy `ZAZU_API_KEY`, `ZAZU_BASE_URL` and `ZAZU_API_VERSION` are still read when the `MANZA_*` name is unset, with a one-time `E_USER_DEPRECATED` warning per variable. The fallback stays for all of 1.x.
+
 ## Response shape
 
 Response bodies are returned as-is from the API — `snake_case` keys in an
-associative array, no typed models. The same shape ships across every Zazu
+associative array, no typed models. The same shape ships across every Manza
 SDK (Ruby, TypeScript, Python, Go, PHP, ...) so the cassette contract is
 one-to-one.
 
 ## Pagination
 
-List endpoints return a `Zazu\Page` with `data`, `hasMore`, and
+List endpoints return a `Manza\Page` with `data`, `hasMore`, and
 `nextCursor`; call `next()` to fetch the following page (null when done).
 Page size is capped at 100.
 
 ## Errors
 
-Non-2xx responses throw `Zazu\Exception\ApiException` with `status`,
+Non-2xx responses throw `Manza\Exception\ApiException` with `status`,
 `kind` (`authentication`, `forbidden`, `not_found`, `validation`,
 `conflict`, `rate_limit`, `server`, `api`), the API's `type`/`message`/`param`, the
 `requestId`, `retryAfter` for 429s, and `paymentId` for a 409 on a
 duplicate `client_reference` (it names the existing draft). 400 and 422
 are both `validation`; 409 is `conflict`. Transport failures throw
-`Zazu\Exception\ConnectionException`; client misconfiguration throws
-`Zazu\Exception\ConfigurationException`.
+`Manza\Exception\ConnectionException`; client misconfiguration throws
+`Manza\Exception\ConfigurationException`.
 
 ## Tests
 
 Tests replay the canonical cassettes recorded by
-[zazu-ruby](https://github.com/getzazu/zazu-ruby), against `https://ma.manza.dev`. The cassettes are
+[manza-ruby](https://github.com/getmanza/manza-ruby), against `https://ma.manza.dev`. The cassettes are
 downloaded from the Ruby SDK's release tarball and served from a Guzzle
 replay handler. Same interactions, same assertions, every language.
 
@@ -105,13 +115,17 @@ composer install
 vendor/bin/phpunit
 ```
 
+## Migrating from `getzazu/zazu-php`
+
+See the migration notes in [CHANGELOG.md](CHANGELOG.md): `composer require manza/manza-php`, `Zazu\` becomes `Manza\`, `ZAZU_*` becomes `MANZA_*`.
+
 ## The SDK family
 
-- [zazu-ruby](https://github.com/getzazu/zazu-ruby) — reference implementation (records the cassettes)
-- [zazu-ts](https://github.com/getzazu/zazu-ts)
-- [zazu-python](https://github.com/getzazu/zazu-python)
-- [zazu-go](https://github.com/getzazu/zazu-go)
-- [cli](https://github.com/getzazu/cli)
+- [manza-ruby](https://github.com/getmanza/manza-ruby) — reference implementation (records the cassettes)
+- [manza-ts](https://github.com/getmanza/manza-ts)
+- [manza-python](https://github.com/getmanza/manza-python)
+- [manza-go](https://github.com/getmanza/manza-go)
+- [cli](https://github.com/getmanza/cli)
 
 ## Releasing
 

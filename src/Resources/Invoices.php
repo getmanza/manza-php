@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Resources;
+namespace Manza\Resources;
 
-use Zazu\Client;
-use Zazu\Page;
-use Zazu\Response;
+use Manza\Client;
+use Manza\Page;
+use Manza\Response;
 
 /**
  * Invoices and their lifecycle actions.

@@ -7,7 +7,7 @@
          failOnRisky="true"
          failOnWarning="true">
     <testsuites>
-        <testsuite name="zazu">
+        <testsuite name="manza">
             <directory>tests</directory>
         </testsuite>
     </testsuites>

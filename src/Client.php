@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace Zazu;
+namespace Manza;
 
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\RequestOptions;
-use Zazu\Exception\ApiException;
-use Zazu\Exception\ConfigurationException;
-use Zazu\Exception\ConnectionException;
+use Manza\Exception\ApiException;
+use Manza\Exception\ConfigurationException;
+use Manza\Exception\ConnectionException;
 
 /**
  * The SDK entry point. Resources hang off it as readonly properties.
  *
- *     $client = new \Zazu\Client(apiKey: 'sk_live_...');
+ *     $client = new \Manza\Client(apiKey: 'sk_live_...');
  *     $page = $client->accounts->list();
  *
  * Response bodies are returned as-is from the API — snake_case keys in
  * associative arrays, no typed models. The same shape ships across every
- * Zazu SDK (Ruby, TypeScript, Python, Go, PHP, ...) so the cassette
+ * Manza SDK (Ruby, TypeScript, Python, Go, PHP, ...) so the cassette
  * contract is one-to-one.
  */
 final class Client
@@ -43,16 +43,19 @@ final class Client
     public readonly Resources\TransferDrafts $transferDrafts;
     public readonly Resources\WebhookEndpoints $webhookEndpoints;
 
+    /** @var array<string, true> */
+    private static array $warned = [];
+
     private readonly string $apiKey;
     private readonly string $baseUrl;
     private readonly ?string $apiVersion;
     private readonly ClientInterface $httpClient;
 
     /**
-     * @param string|null $apiKey API key (default: the ZAZU_API_KEY env var). Required.
-     * @param string|null $baseUrl API base URL (default: ZAZU_BASE_URL or https://ma.manza.finance;
+     * @param string|null $apiKey API key (default: the MANZA_API_KEY env var). Required.
+     * @param string|null $baseUrl API base URL (default: MANZA_BASE_URL or https://ma.manza.finance;
      *   use https://za.manza.finance for South Africa)
-     * @param string|null $apiVersion Pins the Zazu-Version request header (default: ZAZU_API_VERSION)
+     * @param string|null $apiVersion Pins the Manza-Version request header (default: MANZA_API_VERSION)
      * @param float $timeout Request timeout in seconds (ignored when $httpClient is supplied)
      * @param ClientInterface|null $httpClient Swaps the underlying Guzzle client
      *
@@ -65,13 +68,13 @@ final class Client
         float $timeout = self::DEFAULT_TIMEOUT,
         ?ClientInterface $httpClient = null,
     ) {
-        $apiKey ??= self::env('ZAZU_API_KEY');
+        $apiKey ??= self::env('API_KEY');
         if ($apiKey === null || $apiKey === '') {
-            throw new ConfigurationException('Missing API key: pass $apiKey or set ZAZU_API_KEY.');
+            throw new ConfigurationException('Missing API key: pass $apiKey or set MANZA_API_KEY.');
         }
         $this->apiKey = $apiKey;
-        $this->baseUrl = rtrim($baseUrl ?? self::env('ZAZU_BASE_URL') ?? self::DEFAULT_BASE_URL, '/');
-        $this->apiVersion = $apiVersion ?? self::env('ZAZU_API_VERSION');
+        $this->baseUrl = rtrim($baseUrl ?? self::env('BASE_URL') ?? self::DEFAULT_BASE_URL, '/');
+        $this->apiVersion = $apiVersion ?? self::env('API_VERSION');
         $this->httpClient = $httpClient ?? new GuzzleClient([RequestOptions::TIMEOUT => $timeout]);
 
         $this->accounts = new Resources\Accounts($this);
@@ -108,11 +111,11 @@ final class Client
 
         $headers = [
             'Authorization' => 'Bearer ' . $this->apiKey,
-            'User-Agent' => 'zazu-php/' . self::VERSION,
+            'User-Agent' => 'manza-php/' . self::VERSION,
             'Accept' => 'application/json',
         ];
         if ($this->apiVersion !== null && $this->apiVersion !== '') {
-            $headers['Zazu-Version'] = $this->apiVersion;
+            $headers['Manza-Version'] = $this->apiVersion;
         }
 
         $options = [
@@ -229,10 +232,41 @@ final class Client
         return implode('/', $parts);
     }
 
+    /**
+     * Reads MANZA_<name>, falling back to the legacy ZAZU_<name> with a
+     * one-time (per variable) E_USER_DEPRECATED warning. The fallback
+     * stays for all of 1.x.
+     */
     private static function env(string $name): ?string
     {
-        $value = getenv($name);
+        $value = getenv('MANZA_' . $name);
+        if ($value !== false) {
+            return $value === '' ? null : $value;
+        }
 
-        return $value === false || $value === '' ? null : $value;
+        $legacy = getenv('ZAZU_' . $name);
+        if ($legacy === false || $legacy === '') {
+            return null;
+        }
+
+        if (!isset(self::$warned[$name])) {
+            self::$warned[$name] = true;
+            trigger_error(
+                sprintf('manza-php: ZAZU_%1$s is deprecated; use MANZA_%1$s instead.', $name),
+                \E_USER_DEPRECATED,
+            );
+        }
+
+        return $legacy;
+    }
+
+    /**
+     * Forgets which legacy ZAZU_* variables already warned. For tests.
+     *
+     * @internal
+     */
+    public static function resetDeprecationWarnings(): void
+    {
+        self::$warned = [];
     }
 }

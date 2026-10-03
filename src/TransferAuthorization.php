@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Zazu;
+namespace Manza;
 
 /**
  * Signs a machine-authorization challenge for an API-created transfer

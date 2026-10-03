@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Resources;
+namespace Manza\Resources;
 
-use Zazu\Response;
+use Manza\Response;
 
 /**
  * The current entity (the tenant the API key belongs to).

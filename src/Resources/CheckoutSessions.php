@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Resources;
+namespace Manza\Resources;
 
-use Zazu\Client;
-use Zazu\Response;
+use Manza\Client;
+use Manza\Response;
 
 /**
  * One-off hosted checkout sessions. No list, update, or delete; sessions

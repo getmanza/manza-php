@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Resources;
+namespace Manza\Resources;
 
-use Zazu\Client;
-use Zazu\Response;
+use Manza\Client;
+use Manza\Response;
 
 /**
  * API-initiated transfers. Creating a draft never executes a transfer
@@ -28,7 +28,7 @@ final class TransferDrafts extends AbstractResource
      * (external transfer) or destination_account_id (own-account move).
      * Optional: external_account_id, currency_code, payment_reference,
      * internal_notes, client_reference (unique per entity, at most 128
-     * characters; a duplicate throws an {@see \Zazu\Exception\ApiException}
+     * characters; a duplicate throws an {@see \Manza\Exception\ApiException}
      * of kind `conflict` whose `paymentId` names the existing draft).
      *
      * @param array<string, mixed> $attributes snake_case keys, exactly what the API accepts
@@ -51,7 +51,7 @@ final class TransferDrafts extends AbstractResource
      *
      * Executes the draft. `$authorizationId` comes from the
      * `payment.authorization_requested` webhook; build `$signature` with
-     * {@see \Zazu\TransferAuthorization}. Requires the `transfers:authorize`
+     * {@see \Manza\TransferAuthorization}. Requires the `transfers:authorize`
      * scope on a key other than the draft's creator (otherwise 403
      * `same_key_forbidden`). A blank signature is refused locally: the
      * API counts it as a failed attempt, and five fail the challenge.

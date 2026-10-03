@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Resources;
+namespace Manza\Resources;
 
-use Zazu\Client;
+use Manza\Client;
 
 /**
  * Shared scaffolding for every resource. Carries a back-reference to the

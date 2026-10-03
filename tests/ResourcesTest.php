@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Zazu\Tests;
+namespace Manza\Tests;
 
 use GuzzleHttp\Client as GuzzleClient;
 use PHPUnit\Framework\TestCase;
-use Zazu\Client;
-use Zazu\Exception\ApiException;
-use Zazu\Page;
-use Zazu\TransferAuthorization;
+use Manza\Client;
+use Manza\Exception\ApiException;
+use Manza\Page;
+use Manza\TransferAuthorization;
 
 /**
- * Mirror of zazu-ruby's spec/zazu/resources/*_spec.rb (and zazu-go's
+ * Mirror of manza-ruby's spec/manza/resources/*_spec.rb (and manza-go's
  * resources_test.go) — same cassettes, same assertions, per the
  * cross-language SDK contract.
  */
@@ -61,12 +61,12 @@ final class ResourcesTest extends TestCase
         $page = $client->accounts->list();
         $this->assertNotEmpty($page->data, 'expected data rows');
 
-        $accountId = FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID');
+        $accountId = FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID');
         $client->accounts->get($accountId);
 
         $client->accounts->listTransactions($accountId);
 
-        $txId = FixtureIds::id('ZAZU_FIXTURE_TRANSACTION_ID');
+        $txId = FixtureIds::id('MANZA_FIXTURE_TRANSACTION_ID');
         $client->accounts->getTransaction($accountId, $txId);
     }
 
@@ -82,7 +82,7 @@ final class ResourcesTest extends TestCase
 
         $client->customers->list();
 
-        $customerId = FixtureIds::id('ZAZU_FIXTURE_CUSTOMER_ID');
+        $customerId = FixtureIds::id('MANZA_FIXTURE_CUSTOMER_ID');
         $resp = $client->customers->get($customerId);
         $this->assertIsString($resp->body['id'] ?? null, 'expected string id');
     }
@@ -94,7 +94,7 @@ final class ResourcesTest extends TestCase
         $page = $client->invoices->list();
         $this->assertNotEmpty($page->data, 'expected data rows');
 
-        $invoiceId = FixtureIds::id('ZAZU_FIXTURE_INVOICE_ID');
+        $invoiceId = FixtureIds::id('MANZA_FIXTURE_INVOICE_ID');
         $client->invoices->get($invoiceId);
     }
 
@@ -110,7 +110,7 @@ final class ResourcesTest extends TestCase
         $client->paymentLinks->list();
 
         $resp = $client->paymentLinks->create([
-            'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+            'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
             'amount' => '100.00',
             'title' => 'SDK fixture',
             'description' => 'Created by zazu-ruby fixture spec',
@@ -118,7 +118,7 @@ final class ResourcesTest extends TestCase
         ]);
         $this->assertSame(201, $resp->status);
 
-        $client->paymentLinks->cancel(FixtureIds::id('ZAZU_FIXTURE_CANCELLABLE_PAYMENT_LINK_ID'));
+        $client->paymentLinks->cancel(FixtureIds::id('MANZA_FIXTURE_CANCELLABLE_PAYMENT_LINK_ID'));
     }
 
     public function testCheckoutSessions(): void
@@ -126,7 +126,7 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('checkout_sessions/create', 'checkout_sessions/get');
 
         $created = $client->checkoutSessions->create([
-            'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+            'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
             'amount' => '100.00',
             'success_url' => 'https://example.com/zazu-fixture-success?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => 'https://example.com/zazu-fixture-cancel',
@@ -139,7 +139,7 @@ final class ResourcesTest extends TestCase
         $this->assertIsString($created->body['url'] ?? null, 'expected string url');
         $this->assertSame('open', $created->body['status'] ?? null);
 
-        $resp = $client->checkoutSessions->get(FixtureIds::id('ZAZU_FIXTURE_CHECKOUT_SESSION_ID'));
+        $resp = $client->checkoutSessions->get(FixtureIds::id('MANZA_FIXTURE_CHECKOUT_SESSION_ID'));
 
         $this->assertIsString($resp->body['id'] ?? null, 'expected string id');
         $this->assertIsString($resp->body['status'] ?? null, 'expected string status');
@@ -150,7 +150,7 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('webhook_endpoints/list', 'webhook_endpoints/get');
 
         $client->webhookEndpoints->list();
-        $client->webhookEndpoints->get(FixtureIds::id('ZAZU_FIXTURE_WEBHOOK_ID'));
+        $client->webhookEndpoints->get(FixtureIds::id('MANZA_FIXTURE_WEBHOOK_ID'));
 
         $this->addToAssertionCount(1); // both calls matched their cassette interactions
     }
@@ -160,11 +160,11 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('transfer_drafts/create');
 
         $resp = $client->transferDrafts->create([
-            'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
-            'beneficiary_id' => FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'),
+            'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+            'beneficiary_id' => FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'),
             'amount' => '150.00',
             'payment_reference' => 'SDK fixture',
-            'client_reference' => FixtureIds::id('ZAZU_FIXTURE_CLIENT_REFERENCE'),
+            'client_reference' => FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
         ]);
 
         $this->assertSame(201, $resp->status);
@@ -174,7 +174,7 @@ final class ResourcesTest extends TestCase
             'expected requested status (awaiting in-app approval)',
         );
         $this->assertSame(
-            FixtureIds::id('ZAZU_FIXTURE_CLIENT_REFERENCE'),
+            FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
             $resp->body['client_reference'] ?? null,
         );
         $this->assertArrayHasKey('authorization', $resp->body);
@@ -188,10 +188,10 @@ final class ResourcesTest extends TestCase
 
         try {
             $client->transferDrafts->create([
-                'account_id' => FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
-                'beneficiary_id' => FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'),
+                'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+                'beneficiary_id' => FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'),
                 'amount' => '10.00',
-                'client_reference' => FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+                'client_reference' => FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
             ]);
             $this->fail('expected a conflict ApiException');
         } catch (ApiException $e) {
@@ -199,7 +199,7 @@ final class ResourcesTest extends TestCase
             $this->assertSame('conflict', $e->kind);
             $this->assertSame('duplicate_client_reference', $e->type);
             $this->assertSame('client_reference', $e->param);
-            $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID'), $e->paymentId);
+            $this->assertSame(FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID'), $e->paymentId);
         }
     }
 
@@ -207,7 +207,7 @@ final class ResourcesTest extends TestCase
     {
         $client = $this->replayClient('transfer_drafts/get');
 
-        $got = $client->transferDrafts->get(FixtureIds::id('ZAZU_FIXTURE_TRANSFER_DRAFT_ID'));
+        $got = $client->transferDrafts->get(FixtureIds::id('MANZA_FIXTURE_TRANSFER_DRAFT_ID'));
 
         $this->assertIsString($got->body['id'] ?? null, 'expected string id');
         $this->assertArrayHasKey('status', $got->body);
@@ -220,8 +220,8 @@ final class ResourcesTest extends TestCase
 
         try {
             $client->transferDrafts->authorize(
-                FixtureIds::id('ZAZU_FIXTURE_BAD_SIGNATURE_DRAFT_ID'),
-                FixtureIds::id('ZAZU_FIXTURE_BAD_SIGNATURE_AUTHORIZATION_ID'),
+                FixtureIds::id('MANZA_FIXTURE_BAD_SIGNATURE_DRAFT_ID'),
+                FixtureIds::id('MANZA_FIXTURE_BAD_SIGNATURE_AUTHORIZATION_ID'),
                 str_repeat('0', 64),
             );
             $this->fail('expected a validation ApiException');
@@ -238,8 +238,8 @@ final class ResourcesTest extends TestCase
 
         try {
             $client->transferDrafts->authorize(
-                FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID'),
-                FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
+                FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID'),
+                FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
                 str_repeat('0', 64),
             );
             $this->fail('expected a forbidden ApiException');
@@ -253,22 +253,22 @@ final class ResourcesTest extends TestCase
     public function testTransferDraftsAuthorize(): void
     {
         $client = $this->signatureReplayClient('transfer_drafts/authorize');
-        $draftId = FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_DRAFT_ID');
+        $draftId = FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID');
         $input = TransferAuthorization::signatureInput(
             paymentId: $draftId,
-            nonce: FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_NONCE'),
+            nonce: FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_NONCE'),
             amount: '10.0',
             currencyCode: 'MAD',
-            accountId: FixtureIds::id('ZAZU_FIXTURE_ACCOUNT_ID'),
+            accountId: FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
             payee: TransferAuthorization::payeeFor(
-                externalAccountId: FixtureIds::id('ZAZU_FIXTURE_TRUSTED_EXTERNAL_ACCOUNT_ID'),
+                externalAccountId: FixtureIds::id('MANZA_FIXTURE_TRUSTED_EXTERNAL_ACCOUNT_ID'),
             ),
-            clientReference: FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+            clientReference: FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
         );
 
         $resp = $client->transferDrafts->authorize(
             $draftId,
-            FixtureIds::id('ZAZU_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
+            FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
             TransferAuthorization::sign('test-secret-only-used-during-recording', $input),
         );
 
@@ -282,13 +282,13 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('transfer_drafts/decline');
 
         $resp = $client->transferDrafts->decline(
-            FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_DRAFT_ID'),
-            FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_AUTHORIZATION_ID'),
+            FixtureIds::id('MANZA_FIXTURE_DECLINABLE_DRAFT_ID'),
+            FixtureIds::id('MANZA_FIXTURE_DECLINABLE_AUTHORIZATION_ID'),
             'SDK fixture',
         );
 
         $this->assertSame(200, $resp->status);
-        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_DECLINABLE_AUTHORIZATION_ID'), $resp->body['id'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_DECLINABLE_AUTHORIZATION_ID'), $resp->body['id'] ?? null);
         $this->assertSame('declined', $resp->body['status'] ?? null);
         $this->assertIsString($resp->body['declined_at'] ?? null);
     }
@@ -304,7 +304,7 @@ final class ResourcesTest extends TestCase
             'expected embedded external_accounts',
         );
 
-        $resp = $client->beneficiaries->get(FixtureIds::id('ZAZU_FIXTURE_BENEFICIARY_ID'));
+        $resp = $client->beneficiaries->get(FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'));
         $this->assertIsString($resp->body['id'] ?? null, 'expected string id');
         $this->assertIsArray($resp->body['external_accounts'] ?? null);
     }
@@ -329,11 +329,11 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('beneficiaries/list_external_accounts');
 
         $page = $client->beneficiaries->listExternalAccounts(
-            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
+            FixtureIds::id('MANZA_FIXTURE_CREATED_BENEFICIARY_ID'),
         );
 
         $this->assertInstanceOf(Page::class, $page);
-        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'), $page->data[0]['id'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'), $page->data[0]['id'] ?? null);
         $this->assertIsString($page->data[0]['account_number'] ?? null);
         $this->assertFalse($page->hasMore);
         $this->assertNull($page->next());
@@ -344,11 +344,11 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('beneficiaries/get_external_account');
 
         $resp = $client->beneficiaries->getExternalAccount(
-            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
-            FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'),
+            FixtureIds::id('MANZA_FIXTURE_CREATED_BENEFICIARY_ID'),
+            FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'),
         );
 
-        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID'), $resp->body['id'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'), $resp->body['id'] ?? null);
         $this->assertArrayHasKey('default', $resp->body);
     }
 
@@ -357,9 +357,9 @@ final class ResourcesTest extends TestCase
         $client = $this->replayClient('beneficiaries/create_external_account');
 
         $resp = $client->beneficiaries->createExternalAccount(
-            FixtureIds::id('ZAZU_FIXTURE_CREATED_BENEFICIARY_ID'),
+            FixtureIds::id('MANZA_FIXTURE_CREATED_BENEFICIARY_ID'),
             [
-                'account_number' => FixtureIds::id('ZAZU_FIXTURE_NEW_ACCOUNT_NUMBER'),
+                'account_number' => FixtureIds::id('MANZA_FIXTURE_NEW_ACCOUNT_NUMBER'),
                 'name' => 'Fixture Secondary Account',
             ],
         );
@@ -373,12 +373,12 @@ final class ResourcesTest extends TestCase
     {
         $client = $this->replayClient('payee_trust_requests/create');
 
-        $resp = $client->payeeTrustRequests->create([FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID')]);
+        $resp = $client->payeeTrustRequests->create([FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID')]);
 
         $this->assertSame(201, $resp->status);
         $this->assertSame('pending', $resp->body['status'] ?? null);
         $this->assertSame(
-            [FixtureIds::id('ZAZU_FIXTURE_EXTERNAL_ACCOUNT_ID')],
+            [FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID')],
             $resp->body['external_account_ids'] ?? null,
         );
     }
@@ -387,9 +387,9 @@ final class ResourcesTest extends TestCase
     {
         $client = $this->replayClient('payee_trust_requests/get');
 
-        $resp = $client->payeeTrustRequests->get(FixtureIds::id('ZAZU_FIXTURE_PAYEE_TRUST_REQUEST_ID'));
+        $resp = $client->payeeTrustRequests->get(FixtureIds::id('MANZA_FIXTURE_PAYEE_TRUST_REQUEST_ID'));
 
-        $this->assertSame(FixtureIds::id('ZAZU_FIXTURE_PAYEE_TRUST_REQUEST_ID'), $resp->body['id'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_PAYEE_TRUST_REQUEST_ID'), $resp->body['id'] ?? null);
         $this->assertArrayHasKey('resolved_at', $resp->body);
         $this->assertNull($resp->body['resolved_at']);
     }

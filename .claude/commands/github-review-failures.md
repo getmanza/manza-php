@@ -28,7 +28,7 @@ gh run view <run-id> --log-failed
 Categorize:
 - **Test failures** — assertion failed, snapshot mismatch, timeout
 - **Composer failures** — `composer validate --strict` (invalid `composer.json`), `composer install` resolution
-- **Cassette fetch failures** — `scripts/fetch-cassettes.sh` could not download the zazu-ruby tarball
+- **Cassette fetch failures** — `scripts/fetch-cassettes.sh` could not download the manza-ruby tarball
 - **Cassette replay failures** — `CassetteReplayHandler` threw "no cassette interaction matches"
 - **Release failures** — `release.yml` tag-vs-`Client::VERSION` gate, or Packagist not picking up the tag
 
@@ -131,14 +131,14 @@ If the failure was CI-config drift (workflow YAML out of sync with reality), als
 ### Cassette replay says "no handler matched"
 
 The recorded request shape drifted from what the SDK now sends, or two cassettes sharing method + URI were loaded in one test. Either:
-- Fix the SDK to send what zazu-ruby recorded; the cassette is the contract
-- Re-record via zazu-ruby (never here) and ship a new SDK version
+- Fix the SDK to send what manza-ruby recorded; the cassette is the contract
+- Re-record via manza-ruby (never here) and ship a new SDK version
 
 Bodies match as semantic JSON (key order ignored); the three `transfer_drafts/authorize*` cassettes match minus `signature` and need `clientIgnoringSignature()`.
 
 ### "file not found (run scripts/fetch-cassettes.sh first)"
 
-`tests/fixtures/cassettes/` is git-ignored. Run `scripts/fetch-cassettes.sh`. The script resolves the newest zazu-ruby `v*` tag over git, so a brand-new cassette may need a zazu-ruby release first.
+`tests/fixtures/cassettes/` is git-ignored. Run `scripts/fetch-cassettes.sh`. The script resolves the pinned manza-ruby tag (`v1.0.0`); a brand-new cassette needs a manza-ruby release and a deliberate bump of the pin.
 
 ### Release says `src/Client.php does not carry X`
 
@@ -146,7 +146,7 @@ Bodies match as semantic JSON (key order ignored); the three `transfer_drafts/au
 
 ### Packagist shows no new version
 
-Packagist has no OIDC: it syncs from git tags via the GitHub hook. Check the package's repository URL points at `getmanza/zazu-php`.
+Packagist has no OIDC: it syncs from git tags via the GitHub hook. Check the package's repository URL points at `getmanza/manza-php`.
 
 ## Karpathy guidelines
 

@@ -68,8 +68,8 @@ Project conventions:
 
 | Use | Instead of |
 |-----|-----------|
-| `Zazu\Client` (`new Client(apiKey: ...)`), `Client::request()` | hand-rolled Guzzle calls |
-| `Zazu\Page` via `Client::listPage()` (`next()`) | manual cursor loop |
+| `Manza\Client` (`new Client(apiKey: ...)`), `Client::request()` | hand-rolled Guzzle calls |
+| `Manza\Page` via `Client::listPage()` (`next()`) | manual cursor loop |
 | `ApiException::$kind` (`'validation'`, `'conflict'`, ...) | status-code switching, parsing `getMessage()` |
 | `Client::encodePath('api/x', $id, 'action')` | string-interpolated URLs |
 | `TransferAuthorization::signatureInput()` / `sign()` / `payeeFor()` | hand-built signature strings, signing the server's `signature_input` |
@@ -77,7 +77,7 @@ Project conventions:
 | PHPUnit (`vendor/bin/phpunit`) | Pest, Codeception |
 | Cassette replay via `tests/CassetteReplayHandler.php`, ids via `FixtureIds::id()` (`tests/FixtureIds.php`) | mocking Guzzle per test |
 
-**Never call a live Zazu/Manza API** from tests, scripts or this session. Tests replay zazu-ruby's cassettes only (`scripts/fetch-cassettes.sh`); live staging calls create real transfers and approval requests for the team. Only zazu-ruby records cassettes. Load one cassette per test (`authorize` vs `authorize_same_key`, `create` vs `create_duplicate` share method + URI), and use `clientIgnoringSignature()` only for the `transfer_drafts/authorize*` cassettes. If a feature needs a cassette that does not exist yet, stop: it is a zazu-ruby change first.
+**Never call a live Manza API** from tests, scripts or this session. Tests replay manza-ruby's cassettes only (`scripts/fetch-cassettes.sh`); live staging calls create real transfers and approval requests for the team. Only manza-ruby records cassettes. Load one cassette per test (`authorize` vs `authorize_same_key`, `create` vs `create_duplicate` share method + URI), and use `clientIgnoringSignature()` only for the `transfer_drafts/authorize*` cassettes. If a feature needs a cassette that does not exist yet, stop: it is a manza-ruby change first.
 
 ### 4.3 Refactor
 
@@ -156,7 +156,7 @@ git push -u origin $(git branch --show-current)
 
 gh pr create --title "feat(scope): brief description" --body "$(cat <<'EOF'
 ## Summary
-- Key change 1 — uses `Zazu\Page` from the SDK
+- Key change 1 — uses `Manza\Page` from the SDK
 - Key change 2
 
 Closes #<issue_number>
