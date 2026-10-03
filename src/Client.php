@@ -240,8 +240,8 @@ final class Client
     private static function env(string $name): ?string
     {
         $value = getenv('MANZA_' . $name);
-        if ($value !== false && $value !== '') {
-            return $value;
+        if ($value !== false) {
+            return $value === '' ? null : $value;
         }
 
         $legacy = getenv('ZAZU_' . $name);

@@ -130,12 +130,31 @@ final class ClientTest extends TestCase
     public function testManzaEnvVarWinsOverZazuWithoutWarning(): void
     {
         putenv('MANZA_API_KEY=mk');
+        putenv('MANZA_BASE_URL=https://manza.example/');
+        putenv('MANZA_API_VERSION=v-manza');
         putenv('ZAZU_API_KEY=zk');
+        putenv('ZAZU_BASE_URL=https://zazu.example');
+        putenv('ZAZU_API_VERSION=v-zazu');
 
         $request = $this->captureWith();
 
         $this->assertSame('Bearer mk', $request->getHeaderLine('Authorization'));
+        $this->assertSame('manza.example', $request->getUri()->getHost());
+        $this->assertSame('v-manza', $request->getHeaderLine('Manza-Version'));
         $this->assertSame([], $this->deprecations);
+    }
+
+    public function testEmptyManzaEnvVarDoesNotFallBackToZazu(): void
+    {
+        putenv('MANZA_API_KEY=');
+        putenv('ZAZU_API_KEY=zk');
+
+        try {
+            new Client();
+            $this->fail('expected ConfigurationException');
+        } catch (ConfigurationException) {
+            $this->assertSame([], $this->deprecations);
+        }
     }
 
     public function testDeprecationWarningFiresOncePerVariable(): void
