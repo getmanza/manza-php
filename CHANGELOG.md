@@ -7,7 +7,7 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-### Renamed (1.0.0)
+### Changed (breaking)
 
 The SDK is now Manza's. Behaviour is unchanged apart from the names below.
 
@@ -25,9 +25,9 @@ Migrating: `composer remove getzazu/zazu-php && composer require manza/manza-php
 
 The `ZAZU_*` env vars keep working for all of 1.x: each is read only when its `MANZA_*` counterpart is unset, and triggers a one-time `E_USER_DEPRECATED` warning per variable. Move to `MANZA_*` before 2.0.
 
-### Changed (1.0.0)
-
 - Tests replay the `getmanza/manza-ruby` cassettes (pinned to `v1.0.0`); fixture env vars are now `MANZA_FIXTURE_*` (no fallback, dev-only)
+
+## [0.3.0]
 
 ### Added
 
