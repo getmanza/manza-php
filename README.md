@@ -117,7 +117,7 @@ vendor/bin/phpunit
 
 ## Migrating from `getzazu/zazu-php`
 
-See the 1.0.0 entry in [CHANGELOG.md](CHANGELOG.md): `composer require manza/manza-php`, `Zazu\` becomes `Manza\`, `ZAZU_*` becomes `MANZA_*`.
+See the migration notes in [CHANGELOG.md](CHANGELOG.md): `composer require manza/manza-php`, `Zazu\` becomes `Manza\`, `ZAZU_*` becomes `MANZA_*`.
 
 ## The SDK family
 

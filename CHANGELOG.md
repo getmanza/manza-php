@@ -33,7 +33,7 @@ The `ZAZU_*` env vars keep working for all of 1.x: each is read only when its `M
 
 - `ApiException` kind `conflict` (409) with `paymentId`, read from `error.payment_id` on a duplicate transfer `client_reference`
 - `transferDrafts->authorize()` (blank signature refused locally with `\InvalidArgumentException`) and `transferDrafts->decline()` (`reason` optional); `client_reference` documented on `create`
-- `Manza\TransferAuthorization` signer: `signatureInput()`, `sign()` (lowercase hex HMAC-SHA256), `payeeFor()`
+- `Zazu\TransferAuthorization` signer: `signatureInput()`, `sign()` (lowercase hex HMAC-SHA256), `payeeFor()`
 - `beneficiaries->create()`, `listExternalAccounts()`, `getExternalAccount()`, `createExternalAccount()`
 - `payeeTrustRequests` resource: `create()` and `get()`
 - Docs for the new request and response fields: `client_reference`, `authorization`, `settled_at`, `transaction`, `billing_address`, `collect_billing_address`, `customer_name`, `registration_number`, `vat_number`, the `clearing` status; `tax_id`, `ice_number` and `delivery_date` are Morocco only
@@ -53,8 +53,8 @@ Initial release.
 
 ### Added
 
-- `Manza\Client` built on Guzzle (named-argument construction, env-var fallbacks)
+- `Zazu\Client` built on Guzzle (named-argument construction, env-var fallbacks)
 - Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity`, `invoices`, `paymentLinks`, `transferDrafts`, `webhookEndpoints`
-- Cursor-based `Manza\Page` with `next()` (max 100 records per page)
-- `Manza\Exception\ApiException` mirroring the shared SDK error taxonomy
+- Cursor-based `Zazu\Page` with `next()` (max 100 records per page)
+- `Zazu\Exception\ApiException` mirroring the shared SDK error taxonomy
 - Cassette-replay test harness driven by the Ruby SDK's release tarball
