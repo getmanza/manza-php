@@ -26,7 +26,7 @@ use Manza\Exception\ConnectionException;
 final class Client
 {
     /** The SDK version, sent in the User-Agent header. */
-    public const VERSION = '0.3.0';
+    public const VERSION = '1.0.0';
 
     /** Production, Morocco. South Africa is https://za.manza.finance. */
     public const DEFAULT_BASE_URL = 'https://ma.manza.finance';
