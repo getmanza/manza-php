@@ -155,39 +155,37 @@ final class ResourcesTest extends TestCase
         $this->addToAssertionCount(1); // both calls matched their cassette interactions
     }
 
-    public function testTransferDraftsCreateCarriesClientReference(): void
+    public function testPaymentsCreateCarriesClientReference(): void
     {
-        $client = $this->replayClient('transfer_drafts/create');
+        $client = $this->replayClient('payments/create');
 
-        $resp = $client->transferDrafts->create([
+        $resp = $client->payments->create([
             'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
             'beneficiary_id' => FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'),
-            'amount' => '150.00',
+            'amount' => '10.00',
             'payment_reference' => 'SDK fixture',
+            'internal_notes' => '[zazu-ruby-fixture] create spec - do not approve',
             'client_reference' => FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
         ]);
 
         $this->assertSame(201, $resp->status);
-        $this->assertSame(
-            'requested',
-            $resp->body['status'] ?? null,
-            'expected requested status (awaiting in-app approval)',
-        );
+        $this->assertSame('requested', $resp->body['status'] ?? null);
         $this->assertSame(
             FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
             $resp->body['client_reference'] ?? null,
         );
-        $this->assertArrayHasKey('authorization', $resp->body);
+        // Inside the envelope: the challenge went to the authorizer.
+        $this->assertSame('pending', $resp->body['authorization']['status'] ?? null);
         $this->assertArrayHasKey('transfer', $resp->body);
         $this->assertNull($resp->body['transfer'], 'expected null transfer before approval');
     }
 
-    public function testTransferDraftsCreateDuplicateRaisesConflict(): void
+    public function testPaymentsCreateDuplicateRaisesConflict(): void
     {
-        $client = $this->replayClient('transfer_drafts/create_duplicate');
+        $client = $this->replayClient('payments/create_duplicate');
 
         try {
-            $client->transferDrafts->create([
+            $client->payments->create([
                 'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
                 'beneficiary_id' => FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'),
                 'amount' => '10.00',
@@ -203,23 +201,34 @@ final class ResourcesTest extends TestCase
         }
     }
 
-    public function testTransferDraftsGet(): void
+    public function testPaymentsGet(): void
     {
-        $client = $this->replayClient('transfer_drafts/get');
+        $client = $this->replayClient('payments/get');
 
-        $got = $client->transferDrafts->get(FixtureIds::id('MANZA_FIXTURE_TRANSFER_DRAFT_ID'));
+        $got = $client->payments->get(FixtureIds::id('MANZA_FIXTURE_TRANSFER_DRAFT_ID'));
 
         $this->assertIsString($got->body['id'] ?? null, 'expected string id');
         $this->assertArrayHasKey('status', $got->body);
         $this->assertArrayHasKey('transfer', $got->body);
     }
 
-    public function testTransferDraftsAuthorizeWithBadSignature(): void
+    public function testPaymentsGetForADraftRefusedAtCreateTime(): void
     {
-        $client = $this->signatureReplayClient('transfer_drafts/authorize_bad_signature');
+        $client = $this->replayClient('payments/get_refused');
+
+        $got = $client->payments->get(FixtureIds::id('MANZA_FIXTURE_REFUSED_DRAFT_ID'));
+
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_REFUSED_DRAFT_ID'), $got->body['id'] ?? null);
+        $this->assertSame('refused', $got->body['authorization']['status'] ?? null);
+        $this->assertSame('over_transfer_limit', $got->body['authorization']['refusal_reason'] ?? null);
+    }
+
+    public function testPaymentsAuthorizeWithBadSignature(): void
+    {
+        $client = $this->signatureReplayClient('payments/authorize_bad_signature');
 
         try {
-            $client->transferDrafts->authorize(
+            $client->payments->authorize(
                 FixtureIds::id('MANZA_FIXTURE_BAD_SIGNATURE_DRAFT_ID'),
                 FixtureIds::id('MANZA_FIXTURE_BAD_SIGNATURE_AUTHORIZATION_ID'),
                 str_repeat('0', 64),
@@ -232,12 +241,12 @@ final class ResourcesTest extends TestCase
         }
     }
 
-    public function testTransferDraftsAuthorizeWithTheCreatingKey(): void
+    public function testPaymentsAuthorizeWithTheCreatingKey(): void
     {
-        $client = $this->signatureReplayClient('transfer_drafts/authorize_same_key');
+        $client = $this->signatureReplayClient('payments/authorize_same_key');
 
         try {
-            $client->transferDrafts->authorize(
+            $client->payments->authorize(
                 FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID'),
                 FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
                 str_repeat('0', 64),
@@ -250,9 +259,9 @@ final class ResourcesTest extends TestCase
         }
     }
 
-    public function testTransferDraftsAuthorize(): void
+    public function testPaymentsAuthorize(): void
     {
-        $client = $this->signatureReplayClient('transfer_drafts/authorize');
+        $client = $this->signatureReplayClient('payments/authorize');
         $draftId = FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID');
         $input = TransferAuthorization::signatureInput(
             paymentId: $draftId,
@@ -266,7 +275,7 @@ final class ResourcesTest extends TestCase
             clientReference: FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
         );
 
-        $resp = $client->transferDrafts->authorize(
+        $resp = $client->payments->authorize(
             $draftId,
             FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_AUTHORIZATION_ID'),
             TransferAuthorization::sign('test-secret-only-used-during-recording', $input),
@@ -277,11 +286,56 @@ final class ResourcesTest extends TestCase
         $this->assertSame('authorized', $resp->body['authorization']['status'] ?? null);
     }
 
-    public function testTransferDraftsDecline(): void
+    /**
+     * The fresh bank account was never trusted; with "Approve transfers to
+     * new payees" on, the authorizer approves it and the signature trusts it.
+     */
+    public function testPaymentsAuthorizeATransferToANewPayee(): void
     {
-        $client = $this->replayClient('transfer_drafts/decline');
+        $client = $this->signatureReplayClient('payments/authorize_new_payee');
+        $draftId = FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_DRAFT_ID');
+        $input = TransferAuthorization::signatureInput(
+            paymentId: $draftId,
+            nonce: FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_NONCE'),
+            amount: '10.0',
+            currencyCode: 'MAD',
+            accountId: FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+            payee: TransferAuthorization::payeeFor(
+                externalAccountId: FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'),
+            ),
+            clientReference: FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_CLIENT_REFERENCE'),
+        );
 
-        $resp = $client->transferDrafts->decline(
+        $resp = $client->payments->authorize(
+            $draftId,
+            FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_AUTHORIZATION_ID'),
+            TransferAuthorization::sign('test-secret-only-used-during-recording', $input),
+        );
+
+        $this->assertSame(200, $resp->status);
+        $this->assertSame($draftId, $resp->body['id'] ?? null);
+        $this->assertSame('authorized', $resp->body['authorization']['status'] ?? null);
+    }
+
+    /** Recorded after the new-payee authorize: its signature trusted the payee. */
+    public function testTheNewPayeesBankAccountIsTrustedAfterwards(): void
+    {
+        $client = $this->replayClient('beneficiaries/get_external_account_trusted');
+
+        $resp = $client->beneficiaries->getExternalAccount(
+            FixtureIds::id('MANZA_FIXTURE_CREATED_BENEFICIARY_ID'),
+            FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'),
+        );
+
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'), $resp->body['id'] ?? null);
+        $this->assertTrue($resp->body['trusted'] ?? null);
+    }
+
+    public function testPaymentsDecline(): void
+    {
+        $client = $this->replayClient('payments/decline');
+
+        $resp = $client->payments->decline(
             FixtureIds::id('MANZA_FIXTURE_DECLINABLE_DRAFT_ID'),
             FixtureIds::id('MANZA_FIXTURE_DECLINABLE_AUTHORIZATION_ID'),
             'SDK fixture',
@@ -315,7 +369,7 @@ final class ResourcesTest extends TestCase
 
         $resp = $client->beneficiaries->create([
             'beneficiary_type' => 'business',
-            'company_name' => 'Zazu Fixture Beneficiary - spec (zazu-ruby-fixture)',
+            'company_name' => 'Manza Fixture Beneficiary spec',
             'email' => 'fixture-beneficiary-spec@example.com',
         ]);
 
@@ -392,5 +446,21 @@ final class ResourcesTest extends TestCase
         $this->assertSame(FixtureIds::id('MANZA_FIXTURE_PAYEE_TRUST_REQUEST_ID'), $resp->body['id'] ?? null);
         $this->assertArrayHasKey('resolved_at', $resp->body);
         $this->assertNull($resp->body['resolved_at']);
+    }
+
+    public function testTransferAuthorizerGet(): void
+    {
+        $client = $this->replayClient('transfer_authorizer/get');
+
+        $resp = $client->transferAuthorizer->get();
+
+        $this->assertSame(200, $resp->status);
+        $this->assertSame('active', $resp->body['status'] ?? null);
+        $this->assertArrayHasKey('suspension_reason', $resp->body);
+        $this->assertNull($resp->body['suspension_reason']);
+        $this->assertSame('MAD', $resp->body['currency_code'] ?? null);
+        foreach (['per_transfer_limit', 'daily_limit', 'daily_authorized_total', 'secret_expires_at', 'webhook_endpoint_id', 'enrolled_at'] as $key) {
+            $this->assertArrayHasKey($key, $resp->body);
+        }
     }
 }

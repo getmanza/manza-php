@@ -7,6 +7,25 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- `$client->payments` (`Manza\Resources\Payments`): `create()`, `get()`, `authorize()` and `decline()` on the API's canonical paths, `POST /api/payments`, `GET /api/payments/:id`, `POST /api/payments/:id/authorize` and `POST /api/payments/:id/decline`. The API renamed transfer drafts to payments; request and response bodies are unchanged, and so is the `Manza\TransferAuthorization` signature input
+- `$client->transferAuthorizer->get()` (`GET /api/transfer_authorizer`): the enrolled authorizer's `status`, `suspension_reason`, limits, `daily_authorized_total`, `secret_expires_at` and `webhook_endpoint_id`. An `ApiException` of kind `not_found` when none is enrolled
+- `Manza\Webhook` verifies incoming webhook deliveries: `verify()` (boolean), `constructEvent()` (returns the decoded event, throws `\InvalidArgumentException`) and `sign()`. Reads `X-Manza-*` headers in any case, the `$_SERVER` `HTTP_X_MANZA_*` form, list values and the legacy `X-Zazu-*` names; checks the timestamp within 5 minutes (`tolerance: null` skips it, for local replay only). Passes the fixed test vector every SDK in the family shares
+- Documented the new pass-through fields: a draft's `authorization` carries `refusal_reason` (status `refused` when it went to the approvers at create time), bank accounts carry `trusted`, and the challenge webhook's `payment.payee_trusted` says whether the payee was trusted already
+- `examples/transfer_authorizer/`: a `php -S` front controller that verifies the challenge webhook, checks it against a ledger, signs and authorizes (or declines; `ALLOW_NEW_PAYEES=false` declines new payees; retries 5xx, 429, connection failures and 409 `authorization_busy`), a creator script that prints where the API routed the draft, and a preflight that checks every setup step and prints the fix. Not shipped in the package (`.gitattributes` `export-ignore`)
+- README: "Setup, step by step", verifying the webhook, and the example
+
+### Deprecated
+
+- `$client->transferDrafts` and `Manza\Resources\TransferDrafts`. Both keep working for all of 1.x: `TransferDrafts` is now a subclass of `Payments`, so the old name calls `/api/payments` too. The server keeps `/api/transfer_drafts` as a permanent alias
+
+### Changed
+
+- Tests replay `getmanza/manza-ruby`'s `cassettes-v1.3.0` (was `v1.0.0`): the payment cassettes moved from `transfer_drafts/` to `payments/`
+
+## [1.0.0]
+
 ### Changed (breaking)
 
 The SDK is now Manza's. Behaviour is unchanged apart from the names below.

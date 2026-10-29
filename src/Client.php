@@ -40,6 +40,13 @@ final class Client
     public readonly Resources\Invoices $invoices;
     public readonly Resources\PayeeTrustRequests $payeeTrustRequests;
     public readonly Resources\PaymentLinks $paymentLinks;
+    public readonly Resources\Payments $payments;
+    public readonly Resources\TransferAuthorizer $transferAuthorizer;
+
+    /**
+     * @deprecated Use {@see Client::$payments}. Kept for all of 1.x: the
+     *   same methods, calling `/api/payments`.
+     */
     public readonly Resources\TransferDrafts $transferDrafts;
     public readonly Resources\WebhookEndpoints $webhookEndpoints;
 
@@ -85,6 +92,8 @@ final class Client
         $this->invoices = new Resources\Invoices($this);
         $this->payeeTrustRequests = new Resources\PayeeTrustRequests($this);
         $this->paymentLinks = new Resources\PaymentLinks($this);
+        $this->payments = new Resources\Payments($this);
+        $this->transferAuthorizer = new Resources\TransferAuthorizer($this);
         $this->transferDrafts = new Resources\TransferDrafts($this);
         $this->webhookEndpoints = new Resources\WebhookEndpoints($this);
     }

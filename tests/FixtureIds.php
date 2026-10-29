@@ -49,6 +49,14 @@ final class FixtureIds
         // One-time nonce from the authorization webhook. Only needed while
         // recording; it never appears in a request or response.
         'MANZA_FIXTURE_AUTHORIZABLE_NONCE' => 'fixture-authorizable-nonce',
+        // Over the per-transfer limit, so refused at create time.
+        'MANZA_FIXTURE_REFUSED_DRAFT_ID' => 'fixture-refused-draft-id',
+        // 10.00 MAD to MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID, bank details never
+        // trusted: the authorizer approves it and trusts the payee.
+        'MANZA_FIXTURE_NEW_PAYEE_DRAFT_ID' => 'fixture-new-payee-draft-id',
+        'MANZA_FIXTURE_NEW_PAYEE_AUTHORIZATION_ID' => 'fixture-new-payee-authorization-id',
+        'MANZA_FIXTURE_NEW_PAYEE_NONCE' => 'fixture-new-payee-nonce',
+        'MANZA_FIXTURE_NEW_PAYEE_CLIENT_REFERENCE' => 'fixture-new-payee-client-reference',
     ];
 
     public static function id(string $envVar): string

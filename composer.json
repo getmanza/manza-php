@@ -26,7 +26,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Manza\\Tests\\": "tests/"
+            "Manza\\Tests\\": "tests/",
+            "Manza\\Examples\\TransferAuthorizer\\": "examples/transfer_authorizer/src/"
         }
     },
     "scripts": {
