@@ -206,6 +206,18 @@ final class WebhookTest extends TestCase
         $this->assertSame('test.ping', $event['event']);
     }
 
+    public function testConstructEventDoesNotFallBackToXZazuWhenXManzaIsPresentButEmpty(): void
+    {
+        $this->assertConstructFails(
+            'missing X-Manza-Signature header',
+            fn () => $this->construct([
+                'X-Manza-Signature' => '',
+                'X-Manza-Timestamp' => self::TIMESTAMP,
+                'X-Zazu-Signature' => self::SIGNATURE,
+            ]),
+        );
+    }
+
     public function testConstructEventRaisesOnAMissingSignatureHeader(): void
     {
         $this->assertConstructFails(

@@ -170,10 +170,11 @@ final class Webhook
      */
     private static function header(array $normalized, string $suffix): string
     {
-        foreach (["x-manza-{$suffix}", "x-zazu-{$suffix}"] as $name) {
-            if (($normalized[$name] ?? '') !== '') {
-                return $normalized[$name];
-            }
+        // X-Zazu-* only when X-Manza-* is absent: a present but empty
+        // X-Manza-* header is missing, as in every other SDK.
+        $value = $normalized["x-manza-{$suffix}"] ?? $normalized["x-zazu-{$suffix}"] ?? '';
+        if ($value !== '') {
+            return $value;
         }
 
         throw new \InvalidArgumentException('missing X-Manza-' . ucfirst($suffix) . ' header');

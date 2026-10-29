@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use Manza\Client;
 use Manza\Examples\TransferAuthorizer\App;
+use Manza\Examples\TransferAuthorizer\Env;
 use Manza\Examples\TransferAuthorizer\Ledger;
 
 require __DIR__ . '/bootstrap.php';
@@ -39,7 +40,7 @@ $app = new App(
     executor: static function (\Closure $job) use (&$jobs): void {
         $jobs[] = $job;
     },
-    allowNewPayees: !in_array(strtolower(trim((string) (getenv('ALLOW_NEW_PAYEES') ?: 'true'))), ['false', '0', 'no'], true),
+    allowNewPayees: Env::enabled('ALLOW_NEW_PAYEES'),
 );
 
 // The raw body, never re-encoded JSON; $_SERVER carries HTTP_X_MANZA_*.

@@ -36,4 +36,15 @@ final class Env
             $_ENV[$name] = $value;
         }
     }
+
+    /**
+     * A switch that is on unless set to false, 0 or no (any case). Unset or
+     * empty leaves it on.
+     */
+    public static function enabled(string $name): bool
+    {
+        $value = getenv($name);
+
+        return !\in_array(strtolower(trim($value === false ? 'true' : $value)), ['false', '0', 'no'], true);
+    }
 }

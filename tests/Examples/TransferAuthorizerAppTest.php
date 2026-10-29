@@ -49,9 +49,9 @@ final class TransferAuthorizerAppTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->dir . '/{,.}*', \GLOB_BRACE) ?: [] as $file) {
-            if (is_file($file)) {
-                unlink($file);
+        foreach (scandir($this->dir) ?: [] as $file) {
+            if (is_file("{$this->dir}/{$file}")) {
+                unlink("{$this->dir}/{$file}");
             }
         }
         rmdir($this->dir);
