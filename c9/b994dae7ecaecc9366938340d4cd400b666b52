@@ -1,0 +1,19 @@
+examples/transfer_authorizer/authorizer.php
+  s_65c3c5c5f93719::t_e02822a8be54d3 70-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "c9b994dae7ecaecc9366938340d4cd400b666b52",
+  "prompts": {},
+  "sessions": {
+    "s_65c3c5c5f93719": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bee1964f-92c4-4310-92b4-5e82d7d3d709",
+        "model": "unknown"
+      },
+      "human_author": "mhenrixon <mikael@mhenrixon.com>"
+    }
+  }
+}
