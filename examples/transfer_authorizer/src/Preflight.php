@@ -59,7 +59,8 @@ final class Preflight
     ) {
         // Plain decimals only: create_transfer.php sends the string as is, so
         // "1/2" or "1e2" would parse here but not mean the same to the API.
-        $amount = preg_match('/\A\d+(?:\.\d+)?\z/', $rawAmount) === 1 ? self::units($rawAmount) : null;
+        // At most SCALE decimals, so the comparison never drops a digit.
+        $amount = preg_match('/\A\d+(?:\.\d{1,' . self::SCALE . '})?\z/', $rawAmount) === 1 ? self::units($rawAmount) : null;
         $this->amount = $amount !== null && $amount > 0 ? $amount : null;
         $this->out = $out ?? \STDOUT;
         $this->now = $now ?? time();
@@ -275,7 +276,7 @@ final class Preflight
 
         $host = (string) parse_url($url, \PHP_URL_HOST);
         foreach (self::UNSTABLE_TUNNEL_HOSTS as $domain) {
-            if (str_ends_with($host, $domain)) {
+            if ($host === $domain || str_ends_with($host, ".{$domain}")) {
                 $this->warnStep(
                     "webhook endpoint is on {$domain}, whose URL changes when the tunnel restarts",
                     'use a reserved domain or a named tunnel, then enrol an endpoint at that URL',
@@ -403,9 +404,18 @@ final class Preflight
         return $m[1] === '-' ? -$units : $units;
     }
 
+    /**
+     * Two decimals, or as many as the value needs (up to SCALE), so a
+     * failed comparison never prints two equal-looking amounts.
+     */
     private static function format(int $units): string
     {
-        return sprintf('%.2f', $units / 10 ** self::SCALE);
+        $sign = $units < 0 ? '-' : '';
+        $digits = str_pad((string) abs($units), self::SCALE + 1, '0', \STR_PAD_LEFT);
+        $whole = substr($digits, 0, -self::SCALE);
+        $fraction = rtrim(substr($digits, -self::SCALE), '0');
+
+        return $sign . $whole . '.' . str_pad($fraction, 2, '0');
     }
 
     private static function inspect(mixed $value): string

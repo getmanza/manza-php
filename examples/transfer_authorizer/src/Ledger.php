@@ -51,7 +51,9 @@ final class Ledger
             $entries = $this->readEntries();
             $entries[$clientReference] = $entry;
             $tmp = "{$this->path}." . getmypid() . '.tmp';
-            if (file_put_contents($tmp, json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR)) === false
+            $json = json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR);
+            // A short write would rename a truncated ledger over the old one.
+            if (file_put_contents($tmp, $json) !== \strlen($json)
                 || !chmod($tmp, 0o600)
                 || !rename($tmp, $this->path)) {
                 throw new \RuntimeException("cannot write {$this->path}");
@@ -86,7 +88,11 @@ final class Ledger
             return [];
         }
 
-        $json = (string) file_get_contents($this->path);
+        // A failed read is not an empty ledger: record() would write over every entry.
+        $json = @file_get_contents($this->path);
+        if ($json === false) {
+            throw new \RuntimeException("cannot read {$this->path}");
+        }
         if (trim($json) === '') {
             return [];
         }

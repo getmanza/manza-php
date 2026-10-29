@@ -351,6 +351,29 @@ final class PreflightTest extends TestCase
         $this->assertFirstFailureContains($output, '24 hours', '5.00 left');
     }
 
+    public function testShowsTheDecimalsThatDecideAComparison(): void
+    {
+        $this->authorizer['per_transfer_limit'] = '1.233';
+        [, $output] = $this->runPreflight('1.234');
+
+        $this->assertFirstFailureContains($output, '1.234 is over the limit per transfer (1.233)');
+    }
+
+    public function testRefusesMorePrecisionThanItCompares(): void
+    {
+        [, $output] = $this->runPreflight('1.0000009');
+
+        $this->assertFirstFailureContains($output, '"1.0000009"', 'positive decimal');
+    }
+
+    public function testDoesNotWarnForAHostThatOnlyEndsLikeATunnelDomain(): void
+    {
+        $this->endpoint['url'] = 'https://myngrok-free.app/';
+        [, $output] = $this->runPreflight();
+
+        $this->assertSame([], self::lines($output, '!'));
+    }
+
     public function testComparesAmountsExactly(): void
     {
         $this->authorizer['per_transfer_limit'] = '0.3';

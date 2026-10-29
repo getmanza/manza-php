@@ -6,7 +6,7 @@ Two processes and a shared ledger, matching the two-key model of [transfer autho
 |---|---|---|
 | `create_transfer.php` | Creates a transfer draft, records it in `ledger.json` from the API's response | A (`transfers:write`) |
 | `authorizer.php` / `src/App.php` | Receives `payment.authorization_requested`, verifies it, checks the ledger, signs and authorizes (or declines) | B (`transfers:authorize`) |
-| `preflight.php` / `src/Preflight.php` | Checks every setup step and prints the fix for each that fails | A and B |
+| `preflight.php` / `src/Preflight.php` | Checks the setup steps the API shows and prints the fix for each that fails. It cannot see key B's IP allowlist: check that by hand | A and B |
 | `src/Ledger.php` | Your own record of what you created, keyed by `client_reference`. Swap it for your database | — |
 
 No framework and no extra dependency: the SDK and these classes load from the repository's `vendor/`, and `src/Env.php` reads `.env`. The example is not part of the published package.
