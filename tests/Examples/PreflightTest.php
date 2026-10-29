@@ -82,10 +82,6 @@ final class PreflightTest extends TestCase
         $route = $request->getMethod() . ' ' . $request->getUri()->getPath();
         $this->requests[] = "{$key} {$route}";
 
-        if (isset($this->overrides[$route])) {
-            return $this->overrides[$route];
-        }
-
         $routes = [
             'GET /api/entity' => ['key-a', fn () => ['id' => 'e1', 'name' => 'Acme']],
             'GET /api/transfer_authorizer' => ['key-b', fn () => $this->authorizer],
@@ -95,6 +91,10 @@ final class PreflightTest extends TestCase
         ];
         if (!isset($routes[$route]) || $routes[$route][0] !== $key) {
             return self::error(404, 'not_found_error', "no stub for {$key} {$route}");
+        }
+        // Checked after the key, so an override never hides a request made with the wrong key.
+        if (isset($this->overrides[$route])) {
+            return $this->overrides[$route];
         }
 
         return self::json(200, $routes[$route][1]());

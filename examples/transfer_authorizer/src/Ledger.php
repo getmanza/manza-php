@@ -52,10 +52,13 @@ final class Ledger
             $entries[$clientReference] = $entry;
             $tmp = "{$this->path}." . getmypid() . '.tmp';
             $json = json_encode($entries, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR);
-            // A short write would rename a truncated ledger over the old one.
-            if (file_put_contents($tmp, $json) !== \strlen($json)
+            // Owner-only before a byte is written; a short write would rename a
+            // truncated ledger over the old one.
+            if (!touch($tmp)
                 || !chmod($tmp, 0o600)
+                || file_put_contents($tmp, $json) !== \strlen($json)
                 || !rename($tmp, $this->path)) {
+                @unlink($tmp);
                 throw new \RuntimeException("cannot write {$this->path}");
             }
         } finally {
@@ -98,7 +101,11 @@ final class Ledger
         }
 
         $entries = json_decode($json, true, 512, \JSON_THROW_ON_ERROR);
+        // Anything but an object is not a ledger: record() would write over it.
+        if (!\is_array($entries)) {
+            throw new \RuntimeException("{$this->path} is not a ledger (a JSON object keyed by client_reference)");
+        }
 
-        return \is_array($entries) ? $entries : [];
+        return $entries;
     }
 }

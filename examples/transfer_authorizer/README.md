@@ -6,7 +6,7 @@ Two processes and a shared ledger, matching the two-key model of [transfer autho
 |---|---|---|
 | `create_transfer.php` | Creates a transfer draft, records it in `ledger.json` from the API's response | A (`transfers:write`) |
 | `authorizer.php` / `src/App.php` | Receives `payment.authorization_requested`, verifies it, checks the ledger, signs and authorizes (or declines) | B (`transfers:authorize`) |
-| `preflight.php` / `src/Preflight.php` | Checks the setup steps the API shows and prints the fix for each that fails. It cannot see key B's IP allowlist: check that by hand | A and B |
+| `preflight.php` / `src/Preflight.php` | Checks the setup steps the API shows and prints the fix for each that fails. It cannot see key A's `transfers:write`, key B's `transfers:authorize` or key B's IP allowlist: check those by hand | A and B |
 | `src/Ledger.php` | Your own record of what you created, keyed by `client_reference`. Swap it for your database | — |
 
 No framework and no extra dependency: the SDK and these classes load from the repository's `vendor/`, and `src/Env.php` reads `.env`. The example is not part of the published package.
@@ -89,14 +89,14 @@ The authorizer (`php -S`, on stderr):
 
 ## In a Laravel app
 
-`App::handle()` takes the raw body and the headers in any form (`$_SERVER`, `getallheaders()`, a PSR-7 or Symfony header array), so the same class works behind a route. Copy `src/App.php` and `src/Ledger.php` into your app (they are not in the package) and run the answer after the response:
+`App::handle()` takes the raw body and the headers in any form (`$_SERVER`, `getallheaders()`, a PSR-7 or Symfony header array), so the same class works behind a route. Copy `src/App.php` and `src/Ledger.php` into your app (they are not in the package), under your app's namespace (change their `namespace` line and the `use` lines below to match, e.g. `App\Manza`), and run the answer after the response:
 
 ```php
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Manza\Client;
-use Manza\Examples\TransferAuthorizer\App;
-use Manza\Examples\TransferAuthorizer\Ledger;
+use App\Manza\App;      // the copied src/App.php, namespace changed to App\Manza
+use App\Manza\Ledger;   // the copied src/Ledger.php
 
 Route::post('/webhooks/manza', function (Request $request) {
     $app = new App(

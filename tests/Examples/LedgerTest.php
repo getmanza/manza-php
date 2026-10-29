@@ -37,6 +37,29 @@ final class LedgerTest extends TestCase
         $this->assertNull($ledger->find('po_3'));
     }
 
+    public function testRefusesToOverwriteALedgerThatIsNotAJsonObject(): void
+    {
+        foreach (['42', '"text"', 'null'] as $json) {
+            file_put_contents($this->path, $json);
+
+            try {
+                (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
+                $this->fail("expected a RuntimeException for {$json}");
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('not a ledger', $e->getMessage());
+            }
+            $this->assertSame($json, file_get_contents($this->path), 'the file is left as it was');
+        }
+    }
+
+    public function testWritesTheLedgerReadableByItsOwnerOnly(): void
+    {
+        (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
+
+        $this->assertSame(0o600, fileperms($this->path) & 0o777);
+        $this->assertSame([], glob("{$this->path}.*.tmp") ?: [], 'no temporary file is left behind');
+    }
+
     public function testRefusesToOverwriteALedgerItCannotRead(): void
     {
         $ledger = new Ledger($this->path);

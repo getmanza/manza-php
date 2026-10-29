@@ -100,8 +100,10 @@ final class WebhookTest extends TestCase
         $timestamp = (string) time();
         $signature = Webhook::sign(self::PAYLOAD, $timestamp, self::SECRET);
 
+        $stale = (string) (time() - 301);
+
         $this->assertTrue(Webhook::verify(self::PAYLOAD, $signature, $timestamp, self::SECRET));
-        $this->assertFalse(Webhook::verify(self::PAYLOAD, self::SIGNATURE, self::TIMESTAMP, self::SECRET));
+        $this->assertFalse(Webhook::verify(self::PAYLOAD, Webhook::sign(self::PAYLOAD, $stale, self::SECRET), $stale, self::SECRET));
     }
 
     public function testVerifyRejectsANonNumericTimestamp(): void

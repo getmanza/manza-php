@@ -73,7 +73,7 @@ A draft inside your entity's authorization envelope (trusted payee, or a new one
    ```
 
    `trusted` on `$client->beneficiaries->getExternalAccount()` says which it is. The API does not show whether the option is on.
-7. **Run the preflight, then the example** (from `examples/transfer_authorizer/`, after `composer install` in the repository root and filling in `.env`): `php preflight.php` checks what the API shows of steps 1–6 and prints a fix for each that fails. What it cannot see, check by hand: that key B is bound to an IP allowlist, and, for a payee not trusted yet, that *Approve transfers to new payees* is on and key A is bound to an IP allowlist too (it warns, it does not fail). Then `PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:4599 authorizer.php` in one terminal, `php create_transfer.php` in another.
+7. **Run the preflight, then the example** (from `examples/transfer_authorizer/`, after `composer install` in the repository root and filling in `.env`): `php preflight.php` checks what the API shows of steps 1–6 and prints a fix for each that fails. What it cannot see, check by hand: that key A has `transfers:write`, that key B has `transfers:authorize` and is bound to an IP allowlist, and, for a payee not trusted yet, that *Approve transfers to new payees* is on and key A is bound to an IP allowlist too (it warns, it does not fail). Then `PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:4599 authorizer.php` in one terminal, `php create_transfer.php` in another.
 8. **Troubleshooting**: a draft that goes to your approvers instead has an `authorization` with status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
 
 ### Verifying the webhook
@@ -100,6 +100,8 @@ Sign the draft from **your own record** of it with the endpoint's signing secret
 
 ```php
 use Manza\TransferAuthorization;
+
+// $draft: your own record of the draft, e.g. the ->body of $client->payments->create() you stored
 
 $input = TransferAuthorization::signatureInput(
     paymentId: $draft['id'],
