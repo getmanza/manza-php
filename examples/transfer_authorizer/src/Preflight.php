@@ -26,7 +26,7 @@ final class Preflight
         'signature_failures' => 'five invalid signatures in a row: fix the signing, then an approver resumes it in the app',
         'secret_expired' => 'an approver rotates the secret in the app (and resumes it if it stays suspended); '
             . 'set the new one as MANZA_AUTHORIZER_SECRET',
-        'endpoint_disabled' => 're-enable the webhook endpoint ($client->webhookEndpoints->enable()), or enrol a new one if it was '
+        'endpoint_disabled' => 're-enable the webhook endpoint ($client->webhookEndpoints->enable({endpoint})), or enrol a new one if it was '
             . 'deleted; if it stays suspended, an approver resumes it in the app',
     ];
 
@@ -165,7 +165,11 @@ final class Preflight
             $reason = $authorizer['suspension_reason'] ?? null;
             $this->failStep(
                 sprintf('transfer authorizer is %s (%s)', $authorizer['status'] ?? '', $reason ?? ''),
-                self::SUSPENSION_FIXES[$reason] ?? 'see suspension_reason in the transfer authorization docs',
+                str_replace(
+                    '{endpoint}',
+                    self::inspect($authorizer['webhook_endpoint_id'] ?? null),
+                    self::SUSPENSION_FIXES[$reason] ?? 'see suspension_reason in the transfer authorization docs',
+                ),
             );
         }
 

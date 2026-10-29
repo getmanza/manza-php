@@ -59,7 +59,7 @@ A draft inside your entity's authorization envelope (trusted payee, or a new one
 1. **Feature flags.** Ask support to enable API transfers and transfer authorization (`release_api_webhook_authorization`) on your workspace.
 2. **Two API keys.** Key A creates drafts (`transfers:write`; `beneficiaries:request_trust` for step 6; `entity:read`, `accounts:read`, `webhook_endpoints:read` and `beneficiaries:read` for the preflight in step 7). Key B answers the challenges (`transfers:authorize`). The creating key is always refused with 403 `same_key_forbidden`, so keep key B and the signing secret on the system that holds your ledger. Bind key B to an IP allowlist: authorizing from a key without one is refused with 403 `unrestricted_api_key`. Bind key A to one too if you allow new payees (step 6): a draft to a new payee from a key without an allowlist goes to your approvers (`unrestricted_api_key`).
 3. **A stable public URL.** Your authorizer needs an HTTPS URL that never changes: an enrolled endpoint's URL is locked. Use a reserved ngrok domain (`ngrok http --url=your-name.ngrok.app 4599`) or a named Cloudflare tunnel. Never a free ngrok URL: it changes on every restart.
-4. **Create the webhook endpoint** at that URL:
+4. **Create the webhook endpoint** at that URL, with a key that has `webhook_endpoints:write` (key A with that scope added, or any other key):
 
    ```php
    $client->webhookEndpoints->create(['url' => 'https://your-name.ngrok.app/', 'events' => ['transfer.executed']]);
@@ -74,7 +74,7 @@ A draft inside your entity's authorization envelope (trusted payee, or a new one
 
    `trusted` on `$client->beneficiaries->getExternalAccount()` says which it is. The API does not show whether the option is on.
 7. **Run the preflight, then the example** (from `examples/transfer_authorizer/`, after `composer install` in the repository root and filling in `.env`): `php preflight.php` checks what the API shows of steps 1–6 and prints a fix for each that fails. What it cannot see, check by hand: that key A has `transfers:write`, that key B has `transfers:authorize` and is bound to an IP allowlist, and, for a payee not trusted yet, that *Approve transfers to new payees* is on and key A is bound to an IP allowlist too (it warns, it does not fail). Then `PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:4599 authorizer.php` in one terminal, `php create_transfer.php` in another.
-8. **Troubleshooting**: a draft that goes to your approvers instead has an `authorization` with status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
+8. **Troubleshooting**: a draft refused at create time goes to your approvers with an `authorization` of status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); a challenge that closed without an authorize has status `expired`, `superseded` or `failed`, with `refusal_reason` `expired`, `stale` or `signature_failed` (`$client->payments->get()` shows it); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
 
 ### Verifying the webhook
 
@@ -116,7 +116,8 @@ $signature = TransferAuthorization::sign($signingSecret, $input);
 
 $authorizer = new Client(apiKey: getenv('MANZA_AUTHORIZER_API_KEY'));
 $authorizer->payments->authorize($draft['id'], $event['data']['authorization']['id'], $signature);
-$authorizer->payments->decline($draft['id'], $authorizationId, 'Not ours'); // reason is optional
+// Or, instead of authorizing, decline the challenge (reason is optional):
+// $authorizer->payments->decline($draft['id'], $event['data']['authorization']['id'], 'Not ours');
 ```
 
 A blank signature is refused locally with an `\InvalidArgumentException`, because the API counts a missing one as a failed attempt. A wrong signature throws an `ApiException` of kind `validation` (`type` `invalid_signature`). Five on one challenge send the draft to your in-app approvers; five in a row suspend the authorizer.

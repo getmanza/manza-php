@@ -290,7 +290,7 @@ final class PreflightTest extends TestCase
         $this->authorizer = array_merge($this->authorizer, ['status' => 'suspended', 'suspension_reason' => 'endpoint_disabled']);
         [, $output] = $this->runPreflight();
 
-        $this->assertFirstFailureContains($output, 'suspended (endpoint_disabled)', 're-enable');
+        $this->assertFirstFailureContains($output, 'suspended (endpoint_disabled)', 're-enable', 'enable("' . self::ENDPOINT_ID . '")');
     }
 
     public function testFailsWhenTheAccountsCurrencyIsNotTheEnrolledOne(): void
