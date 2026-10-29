@@ -374,6 +374,15 @@ final class PreflightTest extends TestCase
         $this->assertSame([], self::lines($output, '!'));
     }
 
+    public function testFailsTheAmountStepWhenALimitHasMorePrecisionThanItCompares(): void
+    {
+        $this->authorizer['per_transfer_limit'] = '1000.0000001';
+        [$ok, $output] = $this->runPreflight();
+
+        $this->assertFalse($ok);
+        $this->assertFirstFailureContains($output, 'cannot compare', '1000.0000001');
+    }
+
     public function testComparesAmountsExactly(): void
     {
         $this->authorizer['per_transfer_limit'] = '0.3';

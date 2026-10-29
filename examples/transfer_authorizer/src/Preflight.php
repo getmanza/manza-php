@@ -294,8 +294,14 @@ final class Preflight
      */
     private function amountWithinLimits(array $authorizer, int $amount): void
     {
-        $perTransfer = self::units((string) ($authorizer['per_transfer_limit'] ?? ''));
-        $room = self::units((string) ($authorizer['daily_limit'] ?? '')) - self::units((string) ($authorizer['daily_authorized_total'] ?? ''));
+        try {
+            $perTransfer = self::units((string) ($authorizer['per_transfer_limit'] ?? ''));
+            $room = self::units((string) ($authorizer['daily_limit'] ?? '')) - self::units((string) ($authorizer['daily_authorized_total'] ?? ''));
+        } catch (\UnexpectedValueException $e) {
+            $this->failStep("cannot compare the amount with the limits: {$e->getMessage()}", 'check the limits in Settings → Developer → Transfer approval');
+
+            return;
+        }
         if ($amount > $perTransfer) {
             $this->failStep(
                 sprintf('%s is over the limit per transfer (%s)', self::format($amount), self::format($perTransfer)),
@@ -391,12 +397,16 @@ final class Preflight
 
     /**
      * A decimal string ("2500.0") in minor units at {@see self::SCALE}
-     * decimals, exact: no float rounding on the comparison.
+     * decimals, exact: no float rounding on the comparison, and never a
+     * silently dropped digit (more decimals than SCALE throws).
      */
     private static function units(string $decimal): int
     {
         if (preg_match('/\A(-?)(\d+)(?:\.(\d+))?\z/', $decimal, $m) !== 1) {
             throw new \UnexpectedValueException('not a decimal: ' . self::inspect($decimal));
+        }
+        if (rtrim(substr($m[3] ?? '', self::SCALE), '0') !== '') {
+            throw new \UnexpectedValueException(sprintf('%s has more than %d decimals', self::inspect($decimal), self::SCALE));
         }
         $fraction = substr(str_pad($m[3] ?? '', self::SCALE, '0'), 0, self::SCALE);
         $units = (int) ($m[2] . $fraction);
