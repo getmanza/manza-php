@@ -42,6 +42,11 @@ final class LedgerTest extends TestCase
         $ledger = new Ledger($this->path);
         $ledger->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
         chmod($this->path, 0o000);
+        clearstatcache(true, $this->path);
+        if (is_readable($this->path)) {
+            // root, or a filesystem that ignores mode bits: the file stays readable.
+            $this->markTestSkipped('chmod cannot make the ledger unreadable here');
+        }
 
         try {
             $ledger->record('po_2', paymentId: 'p2', amount: '2.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:y');
