@@ -64,6 +64,10 @@ if (function_exists('fastcgi_finish_request')) {
     flush();
 }
 
+// The ledger wait, the authorize call and its retries can outlast
+// max_execution_time (30 s under `php -S`); a fatal here leaves the
+// challenge unanswered.
+set_time_limit(0);
 foreach ($jobs as $job) {
     $job();
 }
