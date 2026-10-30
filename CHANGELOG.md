@@ -7,6 +7,8 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [1.1.0]
+
 ### Added
 
 - `$client->payments` (`Manza\Resources\Payments`): `create()`, `get()`, `authorize()` and `decline()` on the API's canonical paths, `POST /api/payments`, `GET /api/payments/:id`, `POST /api/payments/:id/authorize` and `POST /api/payments/:id/decline`. The API renamed transfer drafts to payments; request and response bodies are unchanged, and so is the `Manza\TransferAuthorization` signature input
