@@ -23,7 +23,7 @@ use Symfony\Component\Yaml\Yaml;
  * ignored — cassettes were recorded against ma.manza.dev). Unmatched
  * requests throw, failing the test.
  *
- * The machine-authorization cassettes (`transfer_drafts/authorize*`)
+ * The machine-authorization cassettes (`payments/authorize*`)
  * match the body with `signature` removed: the recorded signature is an
  * HMAC over a real nonce and secret that replay cannot reproduce. Load
  * those through {@see CassetteReplayHandler::clientIgnoringSignature()}.

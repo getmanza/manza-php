@@ -12,10 +12,13 @@ use GuzzleHttp\Psr7\Response as Psr7Response;
 use PHPUnit\Framework\TestCase;
 use Manza\Client;
 use Manza\Exception\ApiException;
+use Manza\Resources\Payments;
+use Manza\Resources\TransferDrafts;
 
 /**
  * Mirror of the "error mapping" and local-validation specs in manza-ruby's
- * client_spec.rb / transfer_drafts_spec.rb, run against a mock handler.
+ * client_spec.rb / payments_spec.rb / transfer_drafts_spec.rb, run against a
+ * mock handler.
  */
 final class ErrorMappingTest extends TestCase
 {
@@ -106,7 +109,7 @@ final class ErrorMappingTest extends TestCase
 
         foreach (['', '   '] as $blank) {
             try {
-                $client->transferDrafts->authorize('draft', 'auth', $blank);
+                $client->payments->authorize('draft', 'auth', $blank);
                 $this->fail('expected InvalidArgumentException');
             } catch (\InvalidArgumentException $e) {
                 $this->assertStringContainsString('signature', $e->getMessage());
@@ -119,14 +122,55 @@ final class ErrorMappingTest extends TestCase
     {
         $client = $this->client([new Psr7Response(200, [], '{}'), new Psr7Response(200, [], '{}')]);
 
-        $client->transferDrafts->decline('draft', 'auth');
-        $client->transferDrafts->decline('draft', 'auth', 'Not ours');
+        $client->payments->decline('draft', 'auth');
+        $client->payments->decline('draft', 'auth', 'Not ours');
 
         $this->assertSame('{"authorization_id":"auth"}', (string) $this->history[0]['request']->getBody());
         $this->assertSame(
             '{"authorization_id":"auth","reason":"Not ours"}',
             (string) $this->history[1]['request']->getBody(),
         );
-        $this->assertSame('/api/transfer_drafts/draft/decline', $this->history[0]['request']->getUri()->getPath());
+        $this->assertSame('/api/payments/draft/decline', $this->history[0]['request']->getUri()->getPath());
+    }
+
+    public function testTransferAuthorizerGetWithNoneEnrolledIsNotFound(): void
+    {
+        $client = $this->client([$this->errorResponse(404, ['message' => 'Not found', 'type' => 'not_found_error'])]);
+
+        try {
+            $client->transferAuthorizer->get();
+            $this->fail('expected ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame('not_found', $e->kind);
+        }
+        $this->assertSame('/api/transfer_authorizer', $this->history[0]['request']->getUri()->getPath());
+    }
+
+    /** The deprecated alias stays for all of 1.x and calls the canonical paths. */
+    public function testTransferDraftsIsADeprecatedAliasOfPayments(): void
+    {
+        $ok = static fn (): Psr7Response => new Psr7Response(200, [], '{}');
+        $client = $this->client([$ok(), $ok(), $ok(), $ok()]);
+
+        $this->assertInstanceOf(TransferDrafts::class, $client->transferDrafts);
+        $this->assertInstanceOf(Payments::class, $client->transferDrafts);
+
+        $client->transferDrafts->create(['amount' => '1.00']);
+        $client->transferDrafts->get('draft');
+        $client->transferDrafts->authorize('draft', 'auth', 'sig');
+        $client->transferDrafts->decline('draft', 'auth');
+
+        $this->assertSame(
+            [
+                'POST /api/payments',
+                'GET /api/payments/draft',
+                'POST /api/payments/draft/authorize',
+                'POST /api/payments/draft/decline',
+            ],
+            array_map(
+                static fn (array $entry): string => $entry['request']->getMethod() . ' ' . $entry['request']->getUri()->getPath(),
+                $this->history,
+            ),
+        );
     }
 }

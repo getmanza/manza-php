@@ -19,6 +19,7 @@ PHP SDK for the Manza API. It replays the cassettes that **manza-ruby**, the ref
 ```php
 use Manza\Client;
 use Manza\TransferAuthorization;
+use Manza\Webhook;
 use Manza\Exception\ApiException;
 
 $manza = new Client(apiKey: 'sk_live_...');   // or MANZA_API_KEY
@@ -31,20 +32,27 @@ $manza->beneficiaries->getExternalAccount($beneficiaryId, $externalAccountId);
 $manza->beneficiaries->createExternalAccount($beneficiaryId, [...]);
 $manza->payeeTrustRequests->create([$externalAccountId]);
 $manza->payeeTrustRequests->get($id);
-$manza->transferDrafts->create([... 'client_reference' => 'po_1']);
+$manza->payments->create([... 'client_reference' => 'po_1']);   // transferDrafts: deprecated alias (subclass), same paths
+$manza->payments->get($id);                   // authorization: status, refusal_reason
+$manza->transferAuthorizer->get();            // singular; kind not_found when none is enrolled
+
+// Webhooks: raw body + any header form ($_SERVER, PSR-7, Symfony); \InvalidArgumentException on failure
+$event = Webhook::constructEvent($rawBody, $_SERVER, $secret);   // Webhook::verify(...): bool, Webhook::sign(...)
 
 // Machine authorization: sign from your own record, never from the server's signature_input
 $input = TransferAuthorization::signatureInput(paymentId: ..., nonce: ..., amount: ..., currencyCode: ..., accountId: ...,
     payee: TransferAuthorization::payeeFor(externalAccountId: ...), clientReference: ...);
 $signature = TransferAuthorization::sign($secret, $input);   // lowercase hex HMAC-SHA256
-$manza->transferDrafts->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
-$manza->transferDrafts->decline($draftId, $authorizationId, 'reason');      // reason optional
+$manza->payments->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
+$manza->payments->decline($draftId, $authorizationId, 'reason');      // reason optional
 
-try { $manza->transferDrafts->create([...]); }
+try { $manza->payments->create([...]); }
 catch (ApiException $e) { if ($e->kind === 'conflict') { $e->paymentId; } }
 ```
 
-Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity`, `invoices`, `payeeTrustRequests`, `paymentLinks`, `transferDrafts`, `webhookEndpoints`.
+Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity`, `invoices`, `payeeTrustRequests`, `paymentLinks`, `payments` (`transferDrafts` is its deprecated alias), `transferAuthorizer`, `webhookEndpoints`.
+
+`examples/transfer_authorizer/` is a runnable authorizer (`php -S`), creator and preflight; its classes load through an `autoload-dev` entry and `.gitattributes` keeps it out of the package. Its tests live in `tests/Examples/`.
 
 - `Manza\Page`: cursor-based pagination (`data`, `hasMore`, `nextCursor`, `next()`), hard cap of 100 per page (`Page::MAX_PER_PAGE`)
 - Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
@@ -61,10 +69,10 @@ Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity
 
 - **Never call a live Manza API** from tests, scripts or Claude sessions. Tests replay manza-ruby's cassettes only. Live staging calls create real transfers and approval requests for the team. Only manza-ruby records cassettes; a feature that needs a cassette that does not exist is a manza-ruby change first.
 - **Cassette contract.**
-  - Cassettes come from the manza-ruby release pinned in `scripts/fetch-cassettes.sh` (`v1.0.0`; `cassettes-vX.Y.Z.tar.gz`; bump the pin deliberately, `latest` resolves the newest tag); they land in `tests/fixtures/cassettes/` (git-ignored).
+  - Cassettes come from the manza-ruby release pinned in `scripts/fetch-cassettes.sh` (`v1.3.0`; `cassettes-vX.Y.Z.tar.gz`; bump the pin deliberately, `latest` resolves the newest tag); they land in `tests/fixtures/cassettes/` (git-ignored).
   - They are recorded against `https://ma.manza.dev`; the replay handler ignores the host.
-  - Load one cassette per test: `transfer_drafts/authorize` vs `authorize_same_key` (and `authorize_bad_signature`), and `create` vs `create_duplicate`, share method + URI, so loading both makes the first one win.
-  - The three authorize cassettes match the body minus `signature` (`CassetteReplayHandler::clientIgnoringSignature()`).
+  - Load one cassette per test: `payments/authorize` vs `authorize_same_key` (and `authorize_bad_signature`), and `create` vs `create_duplicate`, share method + URI, so loading both makes the first one win.
+  - The four authorize cassettes match the body minus `signature` (`CassetteReplayHandler::clientIgnoringSignature()`).
   - Every other cassette matches method, path, query (key order ignored) and **semantic JSON body** (decoded, string keys sorted, list order kept; non-JSON bodies compare byte for byte).
   - Cassette responses carry no `Content-Length`; the handler synthesises a response with only `Content-Type`.
   - `tests/FixtureIds.php` must stay identical to manza-ruby's `spec/support/fixture_ids.rb` (same env var names, same placeholders).
@@ -150,7 +158,7 @@ Commands are the ones in `.github/workflows/ci.yml`. CI uses PHP 8.3; local PHP 
 
 ```bash
 # One-time setup
-scripts/fetch-cassettes.sh        # the pinned manza-ruby release (v1.0.0); or scripts/fetch-cassettes.sh v1.1.0
+scripts/fetch-cassettes.sh        # the pinned manza-ruby release (v1.3.0); or scripts/fetch-cassettes.sh v1.2.0
 composer install --no-interaction --prefer-dist
 
 # Daily loop
