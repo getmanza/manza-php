@@ -46,8 +46,8 @@ $invoice = $client->invoices->create([
     'customer_id' => $customerId,
     'account_id' => $accountId,
     'currency_code' => 'MAD',
-    'issue_date' => '2026-05-03',
-    'due_date' => '2026-06-03',
+    'issue_date' => '2026-11-14',
+    'due_date' => '2026-12-14',
     'generate_payment_link' => true, // a card payment link, made when approved (payment_links:write; payment links enabled for the entity)
     'items' => [['description' => 'Consulting', 'quantity' => 10, 'unit_price' => '150.00']],
 ]);
@@ -86,9 +86,9 @@ A draft inside your entity's authorization envelope (trusted payee, or a new one
    $client->payeeTrustRequests->create([$externalAccountId]);
    ```
 
-   `trusted` on `$client->beneficiaries->getExternalAccount()` says which it is. The API does not show whether the option is on.
+   `trusted` on `$client->beneficiaries->getExternalAccount()` says which it is. `$client->transferAuthorizer->get()->body['trust_new_payees']` shows whether the option is on, and `new_payee_limit` its limit.
 7. **Run the preflight, then the example** (from `examples/transfer_authorizer/`, after `composer install` in the repository root and filling in `.env`): `php preflight.php` checks what the API shows of steps 1–6 and prints a fix for each that fails. What it cannot see, check by hand: that key A has `transfers:write`, that key B has `transfers:authorize` and is bound to an IP allowlist, and, for a payee not trusted yet, that *Approve transfers to new payees* is on and key A is bound to an IP allowlist too (it warns, it does not fail). Then `PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:4599 authorizer.php` in one terminal, `php create_transfer.php` in another.
-8. **Troubleshooting**: a draft refused at create time goes to your approvers with an `authorization` of status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); a challenge that closed without an authorize has status `expired`, `superseded` or `failed`, with `refusal_reason` `expired`, `stale` or `signature_failed`, and `superseded` with `rail_limit_exceeded` when an authorized transfer was over its rail's limit at execution, so nothing moved (`$client->payments->get()` shows it); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
+8. **Troubleshooting**: a draft refused at create time goes to your approvers with an `authorization` of status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); a challenge that closed without an authorize has status `expired`, `superseded` or `failed`, with `refusal_reason` `expired`, `stale` or `signature_failed` (`$client->payments->get()` shows it). An authorized challenge whose transfer was over its rail's limit at execution has status `superseded` with `refusal_reason` `rail_limit_exceeded`: nothing moved and the draft went to your approvers; `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
 
 ### Verifying the webhook
 

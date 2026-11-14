@@ -109,7 +109,7 @@ final class TransferAuthorizationTest extends TestCase
      * A v1 call (no transferMethod) fails here, not as a failed signature
      * attempt at the API, where five of them fail the challenge.
      */
-    public function testRequiresTransferMethodNullIncluded(): void
+    public function testSignatureInputRequiresTransferMethod(): void
     {
         $this->expectException(\ArgumentCountError::class);
 
