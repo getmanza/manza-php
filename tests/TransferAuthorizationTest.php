@@ -113,7 +113,7 @@ final class TransferAuthorizationTest extends TestCase
     {
         $this->expectException(\ArgumentCountError::class);
 
-        TransferAuthorization::signatureInput( // @phpstan-ignore arguments.count
+        TransferAuthorization::signatureInput(
             paymentId: self::PAYMENT_ID,
             nonce: self::NONCE,
             amount: '2500.0',
@@ -129,7 +129,7 @@ final class TransferAuthorizationTest extends TestCase
     {
         $this->expectException(\ArgumentCountError::class);
 
-        TransferAuthorization::signatureInput( // @phpstan-ignore arguments.count
+        TransferAuthorization::signatureInput(
             self::PAYMENT_ID,
             self::NONCE,
             '2500.0',
