@@ -7,6 +7,43 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-14
+
+Synced to the Manza API at getmanza/app `906ec486e5` (API version `2026-11-13`). A major release: see Migrating from 1.x below.
+
+### Removed
+
+- **Breaking:** `$client->invoices->createPaymentLink()` (`POST /api/invoices/:id/payment_link`). The API retired the endpoint: ask for the link with `generate_payment_link: true` on `invoices->create()` or `invoices->update()` instead
+- **Breaking:** the v1 transfer-authorization signer. `Manza\TransferAuthorization` builds only the v2 input (below)
+
+### Changed
+
+- **Breaking:** `TransferAuthorization::SIGNATURE_VERSION` is `manza.transfer-authorization.v2`, and `signatureInput()` takes a required `?string $transferMethod` (placed before the optional `$clientReference`), appended after `client_reference` (`""` when null): `manza.transfer-authorization.v2|payment_id|nonce|amount|currency_code|account_id|payee|client_reference|transfer_method`. The API verifies v2 for every request that is unpinned or sends `Manza-Version: 2026-11-13`; only `2026-03-27` still verifies v1. Pass the payment's `transfer_method` as the API returned it
+- `Manza\Exception\ApiException` is no longer `final`, so `PlanLimitReachedException` can extend it. Don't subclass it yourself
+- The example authorizer (`examples/transfer_authorizer`) records the create response's `transfer_method` in its ledger, checks it against the webhook's `payment.transfer_method`, signs v2 and compares its input with the webhook's `signature_input_v2`. `Ledger::record()` takes `transferMethod`
+- Invoice docs: `account_id` is required on `invoices->create()` (without one the API answers 422 `state_error`; an account that is not the entity's, 422 with `param` `account_id`), and `invoices->update()` takes it too. An invoice's `status` may be `declined`, and `invoices->delete()` also takes a `declined` invoice that has no number
+- Tests replay `getmanza/manza-ruby`'s `cassettes-v2.0.0` (was `v1.3.0`)
+
+### Added
+
+- `Manza\Exception\PlanLimitReachedException`, a subclass of `ApiException` thrown for a 422 whose `type` is `plan_limit_reached` (a plan cap, which the API used to answer with a 500). Its `kind` stays `validation`; `limitKind` (the API's `kind`, e.g. `invoices`), `current` and `max` read the cap from the error body
+- `generate_payment_link` on `invoices->create()` and `invoices->update()` (needs the `payment_links:write` scope; taken only while payment links are enabled for the entity). Invoice responses carry `generate_payment_link` and the embedded `account`
+- `transfer_method` on `payments->create()`: `eft` or `rtc` in South Africa, `standard` or `instant` in Morocco; one the market does not offer throws a `validation` `ApiException` with `param` `transfer_method`. Payment responses carry `transfer_method` (the rail sent, the provider's default when left out, null where the market offers no choice)
+- Documented: the authorization `refusal_reason` `rail_limit_exceeded` (status `superseded`): an authorized transfer over its rail's limit at execution, sent to the approvers; the authorize call throws a 422 `validation` `ApiException` (`state_error`). A non-boolean `generate_payment_link` throws a `validation` `ApiException` (400)
+- Documented: the `payment.authorization_requested` webhook's `signature_input_v2` and `payment.transfer_method`, and `transferAuthorizer->get()`'s `trust_new_payees` and `new_payee_limit`
+
+### Fixed (API side, no wire change)
+
+- `accounts->listTransactions()` and `accounts->getTransaction()` return posted movements only (getmanza/app 818432457a); the SDK is unchanged
+
+### Migrating from 1.x
+
+- **`createPaymentLink()` is gone.** Replace `$client->invoices->createPaymentLink($id, $accountId)` with `$client->invoices->update($id, ['account_id' => $accountId, 'generate_payment_link' => true])`, or pass `'generate_payment_link' => true` on create. `update()` returns the invoice, not a link: the link is made from the invoice's account when the invoice is approved, and appears in the invoice's `payment_link`. `update()` takes only an invoice that is still `draft`, `pending_approval` or `declined` (any other throws a `validation` `ApiException`, `state_error`); for an invoice already approved or sent there is no API path to attach a link to it: `$client->paymentLinks->create(['account_id' => ..., 'amount' => ...])` makes a standalone link instead
+- **`account_id` is required on invoice create.** Pass the account the invoice is paid into (`$client->accounts->list()`); 1.x calls without it now throw a `validation` `ApiException` (422 `state_error`)
+- **v2 signatures only.** Add `transferMethod: $payment['transfer_method']` to every `TransferAuthorization::signatureInput()` call, and compare with the webhook's `signature_input_v2` instead of `signature_input`. A client pinned to `Manza-Version: 2026-03-27` (`apiVersion:` or `MANZA_API_VERSION`) is verified v1 and must stay on manza-php 1.x; unpin it, or pin `2026-11-13`, to move to 2.0
+- **Plan caps.** A `catch` that tells server errors apart by `$e->kind === 'server'` around creates that may hit a plan cap no longer sees one: catch `PlanLimitReachedException` (or check `kind` `validation`), and do not retry it
+- The example's `Ledger::record()` takes a required `transferMethod`; see `examples/transfer_authorizer/README.md` for ledger entries written by the 1.x example
+
 ## [1.1.0]
 
 ### Added

@@ -11,22 +11,26 @@ namespace Manza;
  * The `payment.authorization_requested` webhook delivers the
  * authorization id and a one-time nonce. Build the signature input
  * from your *own* record of the transfer (not the webhook's
- * `signature_input`, which is there only to compare against), sign
+ * `signature_input_v2`, which is there only to compare against), sign
  * it with the authorizer endpoint's signing secret, and pass the
- * result to {@see Resources\TransferDrafts::authorize()}:
+ * result to {@see Resources\Payments::authorize()}:
  *
  *     $input = TransferAuthorization::signatureInput(
  *         paymentId: $draft['id'], nonce: $nonce, amount: $draft['amount'],
  *         currencyCode: $draft['currency_code'], accountId: $draft['account_id'],
  *         payee: TransferAuthorization::payeeFor(externalAccountId: $draft['external_account_id']),
- *         clientReference: $draft['client_reference'],
+ *         transferMethod: $draft['transfer_method'], clientReference: $draft['client_reference'],
  *     );
  *     $signature = TransferAuthorization::sign($signingSecret, $input);
- *     $authorizer->transferDrafts->authorize($draft['id'], $authorizationId, $signature);
+ *     $authorizer->payments->authorize($draft['id'], $authorizationId, $signature);
+ *
+ * This is the v2 input, which the API verifies for every request that is
+ * unpinned or sends `Manza-Version: 2026-11-13` or later. A client pinned
+ * to `Manza-Version: 2026-03-27` must sign v1 and stays on manza-php 1.x.
  */
 final class TransferAuthorization
 {
-    public const SIGNATURE_VERSION = 'manza.transfer-authorization.v1';
+    public const SIGNATURE_VERSION = 'manza.transfer-authorization.v2';
 
     private function __construct()
     {
@@ -34,6 +38,9 @@ final class TransferAuthorization
 
     /**
      * `$amount` must be the API's decimal string verbatim (e.g. "2500.0").
+     * `$transferMethod` is the payment's rail as the API stores it (the
+     * create response's `transfer_method`): required, and null (signed as
+     * an empty segment) where the market offers no choice.
      * `$clientReference` is empty when the transfer has none.
      *
      * @throws \InvalidArgumentException when $amount is not a string
@@ -45,6 +52,7 @@ final class TransferAuthorization
         string $currencyCode,
         string $accountId,
         string $payee,
+        ?string $transferMethod,
         ?string $clientReference = null,
     ): string {
         if (!\is_string($amount)) {
@@ -62,6 +70,7 @@ final class TransferAuthorization
             $accountId,
             $payee,
             $clientReference ?? '',
+            $transferMethod ?? '',
         ]);
     }
 

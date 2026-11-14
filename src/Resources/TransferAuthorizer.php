@@ -24,8 +24,10 @@ final class TransferAuthorizer extends AbstractResource
      * `secret_expired`, `endpoint_disabled`; null when active),
      * `currency_code`, `per_transfer_limit`, `daily_limit`,
      * `daily_authorized_total` (the last 24 hours), `secret_expires_at`,
-     * `webhook_endpoint_id` and `enrolled_at`. It does not show whether
-     * new payees are approved. Throws an {@see \Manza\Exception\ApiException}
+     * `webhook_endpoint_id`, `enrolled_at`, `trust_new_payees` (whether
+     * "Approve transfers to new payees" is on) and `new_payee_limit` (the
+     * ceiling for a transfer to a new payee, a decimal string; null while
+     * `trust_new_payees` is off). Throws an {@see \Manza\Exception\ApiException}
      * of kind `not_found` when no authorizer is enrolled.
      */
     public function get(): Response

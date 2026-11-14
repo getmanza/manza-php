@@ -31,13 +31,27 @@ $draft = $client->payments->create([
     'amount' => '150.00',
     'payment_reference' => 'INV-000042',
     'client_reference' => 'po_1042', // unique per entity; a duplicate is a `conflict` ApiException
+    'transfer_method' => 'standard',  // optional rail: eft/rtc (ZA), standard/instant (MA); omitted → the default
 ]);
 $client->payments->get($draft->body['id']); // authorization: status, refusal_reason
 // $client->transferDrafts is a deprecated alias of $client->payments (same methods, /api/payments)
 
 // The enrolled transfer authorizer: status, suspension_reason, limits,
-// daily_authorized_total. A `not_found` ApiException when none is enrolled.
+// daily_authorized_total, trust_new_payees, new_payee_limit. A `not_found`
+// ApiException when none is enrolled.
 $client->transferAuthorizer->get();
+
+// Invoices are paid into one of your accounts: account_id is required.
+$invoice = $client->invoices->create([
+    'customer_id' => $customerId,
+    'account_id' => $accountId,
+    'currency_code' => 'MAD',
+    'issue_date' => '2026-05-03',
+    'due_date' => '2026-06-03',
+    'generate_payment_link' => true, // a card payment link, made when approved (payment_links:write; payment links enabled for the entity)
+    'items' => [['description' => 'Consulting', 'quantity' => 10, 'unit_price' => '150.00']],
+]);
+$client->invoices->update($invoice->body['id'], ['account_id' => $accountId, 'generate_payment_link' => false]);
 
 // Beneficiaries and their bank accounts.
 $client->beneficiaries->create(['beneficiary_type' => 'business', 'company_name' => 'Acme Supplies', 'email' => 'ap@acme.com']);
@@ -74,7 +88,7 @@ A draft inside your entity's authorization envelope (trusted payee, or a new one
 
    `trusted` on `$client->beneficiaries->getExternalAccount()` says which it is. The API does not show whether the option is on.
 7. **Run the preflight, then the example** (from `examples/transfer_authorizer/`, after `composer install` in the repository root and filling in `.env`): `php preflight.php` checks what the API shows of steps 1–6 and prints a fix for each that fails. What it cannot see, check by hand: that key A has `transfers:write`, that key B has `transfers:authorize` and is bound to an IP allowlist, and, for a payee not trusted yet, that *Approve transfers to new payees* is on and key A is bound to an IP allowlist too (it warns, it does not fail). Then `PHP_CLI_SERVER_WORKERS=4 php -S 127.0.0.1:4599 authorizer.php` in one terminal, `php create_transfer.php` in another.
-8. **Troubleshooting**: a draft refused at create time goes to your approvers with an `authorization` of status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); a challenge that closed without an authorize has status `expired`, `superseded` or `failed`, with `refusal_reason` `expired`, `stale` or `signature_failed` (`$client->payments->get()` shows it); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
+8. **Troubleshooting**: a draft refused at create time goes to your approvers with an `authorization` of status `refused` and a `refusal_reason` (`create_transfer.php` prints it in words); a challenge that closed without an authorize has status `expired`, `superseded` or `failed`, with `refusal_reason` `expired`, `stale` or `signature_failed`, and `superseded` with `rail_limit_exceeded` when an authorized transfer was over its rail's limit at execution, so nothing moved (`$client->payments->get()` shows it); `$client->transferAuthorizer->get()` shows a suspension and its `suspension_reason`. An authorize answered 409 `authorization_busy` (a bank-detail edit, trust or trust revocation on the same payee was in flight) is safe to retry. The reasons, and an API error's `type`, are in the [transfer authorization docs](https://ma.manza.finance/docs/api/transfer-authorization).
 
 ### Verifying the webhook
 
@@ -96,7 +110,7 @@ try {
 
 ### Signing the challenge
 
-Sign the draft from **your own record** of it with the endpoint's signing secret:
+Sign the draft from **your own record** of it with the endpoint's signing secret. The SDK builds the v2 input (`manza.transfer-authorization.v2`), which ends with the payment's `transfer_method` (an empty segment when it is `null`); compare it with the webhook's `signature_input_v2`. The webhook's `signature_input` is the v1 string, verified only for clients pinned to `Manza-Version: 2026-03-27`: those stay on manza-php 1.x.
 
 ```php
 use Manza\TransferAuthorization;
@@ -110,6 +124,7 @@ $input = TransferAuthorization::signatureInput(
     currencyCode: $draft['currency_code'],
     accountId: $draft['account_id'],
     payee: TransferAuthorization::payeeFor(externalAccountId: $draft['external_account_id']),
+    transferMethod: $draft['transfer_method'],   // required; null signs as ""
     clientReference: $draft['client_reference'],
 );
 $signature = TransferAuthorization::sign($signingSecret, $input);
@@ -128,9 +143,11 @@ A blank signature is refused locally with an `\InvalidArgumentException`, becaus
 |---|---|
 | `MANZA_API_KEY` | API key, used when `apiKey` is not passed |
 | `MANZA_BASE_URL` | Base URL (default `https://ma.manza.finance`) |
-| `MANZA_API_VERSION` | Pins the `Manza-Version` request header |
+| `MANZA_API_VERSION` | Pins the `Manza-Version` request header (e.g. `2026-11-13`) |
 
-The legacy `ZAZU_API_KEY`, `ZAZU_BASE_URL` and `ZAZU_API_VERSION` are still read when the `MANZA_*` name is unset, with a one-time `E_USER_DEPRECATED` warning per variable. The fallback stays for all of 1.x.
+Unpinned, the API answers with its current version. manza-php 2.x signs transfer authorizations v2, which the API verifies for unpinned requests and requests pinned to `2026-11-13` or later; a client pinned to `2026-03-27` must stay on manza-php 1.x.
+
+The legacy `ZAZU_API_KEY`, `ZAZU_BASE_URL` and `ZAZU_API_VERSION` are still read when the `MANZA_*` name is unset, with a one-time `E_USER_DEPRECATED` warning per variable. The fallback stays in 1.x and 2.0.
 
 ## Response shape
 
@@ -152,7 +169,11 @@ Non-2xx responses throw `Manza\Exception\ApiException` with `status`,
 `conflict`, `rate_limit`, `server`, `api`), the API's `type`/`message`/`param`, the
 `requestId`, `retryAfter` for 429s, and `paymentId` for a 409 on a
 duplicate `client_reference` (it names the existing draft). 400 and 422
-are both `validation`; 409 is `conflict`. Transport failures throw
+are both `validation`; 409 is `conflict`. A 422 whose `type` is
+`plan_limit_reached` (a plan cap: retrying does not help) is thrown as the
+subclass `Manza\Exception\PlanLimitReachedException`, still of kind
+`validation`, carrying `limitKind` (what is capped, the API's `kind`),
+`current` and `max`. Transport failures throw
 `Manza\Exception\ConnectionException`; client misconfiguration throws
 `Manza\Exception\ConfigurationException`.
 

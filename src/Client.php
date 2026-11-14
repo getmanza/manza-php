@@ -44,7 +44,7 @@ final class Client
     public readonly Resources\TransferAuthorizer $transferAuthorizer;
 
     /**
-     * @deprecated Use {@see Client::$payments}. Kept for all of 1.x: the
+     * @deprecated Use {@see Client::$payments}. Kept in 1.x and 2.0: the
      *   same methods, calling `/api/payments`.
      */
     public readonly Resources\TransferDrafts $transferDrafts;
@@ -244,7 +244,7 @@ final class Client
     /**
      * Reads MANZA_<name>, falling back to the legacy ZAZU_<name> with a
      * one-time (per variable) E_USER_DEPRECATED warning. The fallback
-     * stays for all of 1.x.
+     * stays in 1.x and 2.0.
      */
     private static function env(string $name): ?string
     {

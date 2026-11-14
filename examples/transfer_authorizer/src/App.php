@@ -39,6 +39,7 @@ final class App
         'currency_code' => 'currency_code',
         'account_id' => 'account_id',
         'payee' => 'payee',
+        'transfer_method' => 'transfer_method',
     ];
 
     /**
@@ -166,7 +167,7 @@ final class App
                 self::text($payment['currency_code'] ?? null),
                 self::text($payment['payee'] ?? null),
             ));
-            $this->authorize($entry, $authorization, (string) $clientReference, $data['signature_input'] ?? null);
+            $this->authorize($entry, $authorization, (string) $clientReference, $data['signature_input_v2'] ?? null);
         } catch (ApiException|ConnectionException $e) {
             $this->log('error', sprintf(
                 'API error %s: %s (type %s, request_id %s)',
@@ -217,8 +218,9 @@ final class App
     }
 
     /**
-     * Sign from the ledger, never from the webhook: `signature_input` in the
-     * webhook is only there to compare against.
+     * Sign from the ledger, never from the webhook: `signature_input_v2` in
+     * the webhook is only there to compare against. (Its `signature_input`
+     * is the v1 string, for clients pinned to Manza-Version 2026-03-27.)
      *
      * @param array<string, mixed> $entry
      * @param array<string, mixed> $authorization
@@ -232,6 +234,7 @@ final class App
             currencyCode: (string) $entry['currency_code'],
             accountId: (string) $entry['account_id'],
             payee: (string) $entry['payee'],
+            transferMethod: \is_string($entry['transfer_method'] ?? null) ? $entry['transfer_method'] : null,
             clientReference: $clientReference,
         );
         // A signature over a different input is sure to fail, and failed

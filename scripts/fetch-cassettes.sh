@@ -3,7 +3,7 @@
 # CI calls this before running tests so we don't have to commit cassettes
 # into both repos.
 #
-#   scripts/fetch-cassettes.sh            # the pinned tag (v1.3.0)
+#   scripts/fetch-cassettes.sh            # the pinned tag (v2.0.0)
 #   scripts/fetch-cassettes.sh v1.2.0     # specific tag, e.g. to try a newer release
 #   scripts/fetch-cassettes.sh latest     # newest v* tag
 #
@@ -14,7 +14,7 @@ REPO="getmanza/manza-ruby"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DEST="$ROOT/tests/fixtures/cassettes"
 
-TAG="${1:-v1.3.0}"
+TAG="${1:-v2.0.0}"
 [[ "$TAG" == "latest" ]] && TAG=""
 AUTH=()
 if [[ -n "${GH_TOKEN:-}" ]]; then
