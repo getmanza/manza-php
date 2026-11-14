@@ -12,7 +12,7 @@ namespace Manza\Examples\TransferAuthorizer;
  *
  *     {"po_8812": {"payment_id": "...", "amount": "2500.0",
  *                  "currency_code": "MAD", "account_id": "...",
- *                  "payee": "ext:..."}}
+ *                  "payee": "ext:...", "transfer_method": "standard"}}
  */
 final class Ledger
 {
@@ -21,7 +21,10 @@ final class Ledger
     }
 
     /**
-     * @return array<string, string> the entry written
+     * `$transferMethod` is the create response's (null where the market
+     * offers no choice): the v2 signature signs it.
+     *
+     * @return array<string, string|null> the entry written
      */
     public function record(
         string $clientReference,
@@ -30,6 +33,7 @@ final class Ledger
         string $currencyCode,
         string $accountId,
         string $payee,
+        ?string $transferMethod,
     ): array {
         $entry = [
             'payment_id' => $paymentId,
@@ -37,6 +41,7 @@ final class Ledger
             'currency_code' => $currencyCode,
             'account_id' => $accountId,
             'payee' => $payee,
+            'transfer_method' => $transferMethod,
         ];
 
         // Serialize writers on a separate lock file, write the new ledger to a

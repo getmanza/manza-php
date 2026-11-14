@@ -32,6 +32,9 @@ final class TransferAuthorizerAppTest extends TestCase
     private const SIGNATURE_INPUT = 'manza.transfer-authorization.v1|01958e51-7c5a-7000-8000-000000000012|'
         . '9f86d081884c7d659a2feaa0c55ad015|2500.0|ZAR|01958e51-7c5a-7000-8000-000000000013|'
         . 'ext:01958e51-7c5a-7000-8000-000000000014|po_8812';
+    private const SIGNATURE_INPUT_V2 = 'manza.transfer-authorization.v2|01958e51-7c5a-7000-8000-000000000012|'
+        . '9f86d081884c7d659a2feaa0c55ad015|2500.0|ZAR|01958e51-7c5a-7000-8000-000000000013|'
+        . 'ext:01958e51-7c5a-7000-8000-000000000014|po_8812|eft';
 
     private string $dir;
     private Ledger $ledger;
@@ -58,7 +61,8 @@ final class TransferAuthorizerAppTest extends TestCase
     }
 
     /**
-     * getmanza/app WebhookEvents::PaymentAuthorizationRequested.example_payload, verbatim.
+     * getmanza/app WebhookEvents::PaymentAuthorizationRequested.example_payload, verbatim,
+     * with v2's `signature_input_v2` and `payment.transfer_method`.
      *
      * @return array<string, mixed>
      */
@@ -86,14 +90,16 @@ final class TransferAuthorizerAppTest extends TestCase
                     'destination_account_id' => null,
                     'payment_reference' => 'INV-2026-001',
                     'client_reference' => 'po_8812',
+                    'transfer_method' => 'eft',
                     'payee_trusted' => false,
                 ],
                 'signature_input' => self::SIGNATURE_INPUT,
+                'signature_input_v2' => self::SIGNATURE_INPUT_V2,
             ],
         ];
     }
 
-    private function recordLedgerEntry(string $amount = '2500.0'): void
+    private function recordLedgerEntry(string $amount = '2500.0', ?string $transferMethod = 'eft'): void
     {
         $this->ledger->record(
             'po_8812',
@@ -102,12 +108,13 @@ final class TransferAuthorizerAppTest extends TestCase
             currencyCode: 'ZAR',
             accountId: '01958e51-7c5a-7000-8000-000000000013',
             payee: 'ext:01958e51-7c5a-7000-8000-000000000014',
+            transferMethod: $transferMethod,
         );
     }
 
-    private static function expectedSignature(): string
+    private static function ledgerInput(): string
     {
-        $input = TransferAuthorization::signatureInput(
+        return TransferAuthorization::signatureInput(
             paymentId: '01958e51-7c5a-7000-8000-000000000012',
             nonce: '9f86d081884c7d659a2feaa0c55ad015',
             amount: '2500.0',
@@ -115,9 +122,13 @@ final class TransferAuthorizerAppTest extends TestCase
             accountId: '01958e51-7c5a-7000-8000-000000000013',
             payee: 'ext:01958e51-7c5a-7000-8000-000000000014',
             clientReference: 'po_8812',
+            transferMethod: 'eft',
         );
+    }
 
-        return TransferAuthorization::sign(self::SECRET, $input);
+    private static function expectedSignature(): string
+    {
+        return TransferAuthorization::sign(self::SECRET, self::ledgerInput());
     }
 
     /**
@@ -239,16 +250,33 @@ final class TransferAuthorizerAppTest extends TestCase
         $this->assertLogContains('API error', 'invalid_signature', 'req_123');
     }
 
-    public function testLogsBothSignatureInputsAndDoesNotAuthorizeWhenTheWebhooksDiffersFromTheLedgers(): void
+    public function testSignsTheWebhooksV2Input(): void
+    {
+        $this->assertSame(self::SIGNATURE_INPUT_V2, self::ledgerInput());
+    }
+
+    public function testLogsBothSignatureInputsAndDoesNotAuthorizeWhenTheWebhooksV2InputDiffersFromTheLedgers(): void
     {
         $this->recordLedgerEntry();
         $payload = self::examplePayload();
-        $payload['data']['signature_input'] = 'something-else';
+        $payload['data']['signature_input_v2'] = 'something-else';
 
         $this->deliver($this->app(), self::json($payload));
 
         $this->assertSame([], $this->calls());
-        $this->assertLogContains('something-else', self::SIGNATURE_INPUT);
+        $this->assertLogContains('something-else', self::SIGNATURE_INPUT_V2);
+    }
+
+    public function testDeclinesATransferMethodThatDiffersFromTheLedgersWithAReasonNamingIt(): void
+    {
+        $this->recordLedgerEntry(transferMethod: 'rtc');
+        $app = $this->app([self::apiResponse(200, ['id' => self::AUTHORIZATION_ID, 'status' => 'declined'])]);
+
+        $this->deliver($app, self::json(self::examplePayload()));
+
+        $this->assertSame(['POST /api/payments/' . self::DRAFT_ID . '/decline'], $this->calls());
+        $this->assertSame(self::AUTHORIZATION_ID, $this->requestBody(0)['authorization_id']);
+        $this->assertStringContainsString('transfer_method', $this->requestBody(0)['reason']);
     }
 
     public function testRetriesAuthorizeAfterATransientFailure(): void

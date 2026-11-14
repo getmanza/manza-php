@@ -13,9 +13,14 @@ use Psr\Http\Message\ResponseInterface;
  * Match on {@see ApiException::$kind} (`authentication`, `forbidden`,
  * `not_found`, `validation`, `conflict`, `rate_limit`, `server`, `api`)
  * instead of subclassing. A `conflict` (409) carries {@see ApiException::$paymentId}
- * for a duplicate transfer `client_reference`.
+ * for a duplicate transfer `client_reference`. A `validation` 422 whose
+ * `type` is `plan_limit_reached` is thrown as its subclass
+ * {@see PlanLimitReachedException}, carrying the cap.
+ *
+ * Not final only so {@see PlanLimitReachedException} can extend it; don't
+ * subclass it yourself.
  */
-final class ApiException extends \RuntimeException
+class ApiException extends \RuntimeException
 {
     /**
      * @param string $kind One of: authentication, forbidden, not_found, validation, conflict, rate_limit, server, api
@@ -80,6 +85,20 @@ final class ApiException extends \RuntimeException
         }
 
         $requestId = $response->getHeaderLine('X-Request-Id');
+        $requestId = $requestId !== '' ? $requestId : null;
+
+        if ($status === 422 && $type === 'plan_limit_reached' && \is_array($payload)) {
+            return new PlanLimitReachedException(
+                status: $status,
+                message: $message,
+                param: $param,
+                requestId: $requestId,
+                body: $body,
+                limitKind: \is_string($payload['kind'] ?? null) ? $payload['kind'] : null,
+                current: \is_int($payload['current'] ?? null) ? $payload['current'] : null,
+                max: \is_int($payload['max'] ?? null) ? $payload['max'] : null,
+            );
+        }
 
         return new self(
             status: $status,
@@ -87,7 +106,7 @@ final class ApiException extends \RuntimeException
             type: $type,
             message: $message,
             param: $param,
-            requestId: $requestId !== '' ? $requestId : null,
+            requestId: $requestId,
             retryAfter: $retryAfter,
             body: $body,
             paymentId: $paymentId,

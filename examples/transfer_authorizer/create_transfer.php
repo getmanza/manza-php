@@ -64,6 +64,7 @@ try {
         currencyCode: $draft['currency_code'],
         accountId: $draft['account_id'],
         payee: $payee,
+        transferMethod: $draft['transfer_method'] ?? null,
     );
 } catch (\Throwable $e) {
     fwrite(STDERR, sprintf(

@@ -12,6 +12,7 @@ use GuzzleHttp\Psr7\Response as Psr7Response;
 use PHPUnit\Framework\TestCase;
 use Manza\Client;
 use Manza\Exception\ApiException;
+use Manza\Exception\PlanLimitReachedException;
 use Manza\Resources\Payments;
 use Manza\Resources\TransferDrafts;
 
@@ -103,6 +104,64 @@ final class ErrorMappingTest extends TestCase
         }
     }
 
+    /** The API's body verbatim (getmanza/app spec/requests/api/invoices_spec.rb). */
+    public function testMaps422PlanLimitReachedToPlanLimitReachedExceptionCarryingKindCurrentAndMax(): void
+    {
+        $client = $this->client([
+            $this->errorResponse(422, [
+                'type' => 'plan_limit_reached',
+                'message' => 'Plan limit reached for invoices: 10 of 10',
+                'kind' => 'invoices',
+                'current' => 10,
+                'max' => 10,
+            ]),
+        ]);
+
+        try {
+            $client->entity->get();
+            $this->fail('expected PlanLimitReachedException');
+        } catch (PlanLimitReachedException $e) {
+            $this->assertInstanceOf(ApiException::class, $e);
+            $this->assertSame(422, $e->status);
+            $this->assertSame('validation', $e->kind);
+            $this->assertSame('plan_limit_reached', $e->type);
+            $this->assertSame('Plan limit reached for invoices: 10 of 10', $e->getMessage());
+            $this->assertSame(['invoices', 10, 10], [$e->limitKind, $e->current, $e->max]);
+        }
+    }
+
+    public function testKeepsAnyOther422APlainValidationApiException(): void
+    {
+        $client = $this->client([
+            $this->errorResponse(422, ['message' => 'Customer not found', 'type' => 'invalid_request_error', 'param' => 'customer_id']),
+        ]);
+
+        try {
+            $client->entity->get();
+            $this->fail('expected ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(ApiException::class, $e::class);
+            $this->assertSame('validation', $e->kind);
+            $this->assertSame('customer_id', $e->param);
+        }
+    }
+
+    /** Only a 422 is a plan cap: the same type on another status keeps its kind. */
+    public function testKeepsPlanLimitReachedOnAnotherStatusAPlainApiException(): void
+    {
+        $client = $this->client([
+            $this->errorResponse(500, ['type' => 'plan_limit_reached', 'message' => 'boom', 'kind' => 'invoices', 'current' => 1, 'max' => 1]),
+        ]);
+
+        try {
+            $client->entity->get();
+            $this->fail('expected ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(ApiException::class, $e::class);
+            $this->assertSame('server', $e->kind);
+        }
+    }
+
     public function testAuthorizeRefusesABlankSignatureBeforeAnyHttpCall(): void
     {
         $client = $this->client([]);
@@ -146,7 +205,7 @@ final class ErrorMappingTest extends TestCase
         $this->assertSame('/api/transfer_authorizer', $this->history[0]['request']->getUri()->getPath());
     }
 
-    /** The deprecated alias stays for all of 1.x and calls the canonical paths. */
+    /** The deprecated alias stays in 1.x and 2.0 and calls the canonical paths. */
     public function testTransferDraftsIsADeprecatedAliasOfPayments(): void
     {
         $ok = static fn (): Psr7Response => new Psr7Response(200, [], '{}');

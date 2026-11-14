@@ -21,6 +21,7 @@ use Manza\Client;
 use Manza\TransferAuthorization;
 use Manza\Webhook;
 use Manza\Exception\ApiException;
+use Manza\Exception\PlanLimitReachedException;
 
 $manza = new Client(apiKey: 'sk_live_...');   // or MANZA_API_KEY
 
@@ -39,14 +40,15 @@ $manza->transferAuthorizer->get();            // singular; kind not_found when n
 // Webhooks: raw body + any header form ($_SERVER, PSR-7, Symfony); \InvalidArgumentException on failure
 $event = Webhook::constructEvent($rawBody, $_SERVER, $secret);   // Webhook::verify(...): bool, Webhook::sign(...)
 
-// Machine authorization: sign from your own record, never from the server's signature_input
+// Machine authorization (v2): sign from your own record, never from the server's signature_input_v2
 $input = TransferAuthorization::signatureInput(paymentId: ..., nonce: ..., amount: ..., currencyCode: ..., accountId: ...,
-    payee: TransferAuthorization::payeeFor(externalAccountId: ...), clientReference: ...);
+    payee: TransferAuthorization::payeeFor(externalAccountId: ...), clientReference: ..., transferMethod: ...);
 $signature = TransferAuthorization::sign($secret, $input);   // lowercase hex HMAC-SHA256
 $manza->payments->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
 $manza->payments->decline($draftId, $authorizationId, 'reason');      // reason optional
 
 try { $manza->payments->create([...]); }
+catch (PlanLimitReachedException $e) { $e->limitKind; $e->current; $e->max; }   // a 422 plan cap, kind validation
 catch (ApiException $e) { if ($e->kind === 'conflict') { $e->paymentId; } }
 ```
 
@@ -55,7 +57,7 @@ Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity
 `examples/transfer_authorizer/` is a runnable authorizer (`php -S`), creator and preflight; its classes load through an `autoload-dev` entry and `.gitattributes` keeps it out of the package. Its tests live in `tests/Examples/`.
 
 - `Manza\Page`: cursor-based pagination (`data`, `hasMore`, `nextCursor`, `next()`), hard cap of 100 per page (`Page::MAX_PER_PAGE`)
-- Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
+- Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Its one subclass, `PlanLimitReachedException` (since 2.0), is a 422 `type` `plan_limit_reached` of kind `validation` carrying `limitKind` (the API's `kind`, renamed because `$kind` is the discriminator), `current` and `max`. Eight kinds; with `ConnectionException` and `ConfigurationException` that makes the family's ten error types, and the `PlanLimitReachedException` subclass (a `validation` kind, not a ninth) is the eleventh class: `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
 - Snake-case wire format: responses are associative arrays with the API's keys, no typed models. **No auto-camelCasing.**
 
 ## How to work in this codebase
@@ -69,17 +71,17 @@ Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity
 
 - **Never call a live Manza API** from tests, scripts or Claude sessions. Tests replay manza-ruby's cassettes only. Live staging calls create real transfers and approval requests for the team. Only manza-ruby records cassettes; a feature that needs a cassette that does not exist is a manza-ruby change first.
 - **Cassette contract.**
-  - Cassettes come from the manza-ruby release pinned in `scripts/fetch-cassettes.sh` (`v1.3.0`; `cassettes-vX.Y.Z.tar.gz`; bump the pin deliberately, `latest` resolves the newest tag); they land in `tests/fixtures/cassettes/` (git-ignored).
+  - Cassettes come from the manza-ruby release pinned in `scripts/fetch-cassettes.sh` (`v2.0.0`; `cassettes-vX.Y.Z.tar.gz`; bump the pin deliberately, `latest` resolves the newest tag); they land in `tests/fixtures/cassettes/` (git-ignored).
   - They are recorded against `https://ma.manza.dev`; the replay handler ignores the host.
   - Load one cassette per test: `payments/authorize` vs `authorize_same_key` (and `authorize_bad_signature`), and `create` vs `create_duplicate`, share method + URI, so loading both makes the first one win.
   - The four authorize cassettes match the body minus `signature` (`CassetteReplayHandler::clientIgnoringSignature()`).
   - Every other cassette matches method, path, query (key order ignored) and **semantic JSON body** (decoded, string keys sorted, list order kept; non-JSON bodies compare byte for byte).
   - Cassette responses carry no `Content-Length`; the handler synthesises a response with only `Content-Type`.
   - `tests/FixtureIds.php` must stay identical to manza-ruby's `spec/support/fixture_ids.rb` (same env var names, same placeholders).
-- **Hosts.** Default `https://ma.manza.finance` (Morocco), South Africa `https://za.manza.finance`, staging and cassettes `https://ma.manza.dev`. Env vars are `MANZA_API_KEY`, `MANZA_BASE_URL`, `MANZA_API_VERSION`; the `ZAZU_*` names are read as a deprecated fallback (one-time `E_USER_DEPRECATED` warning) for all of 1.x. Fixture env vars are `MANZA_FIXTURE_*` with no fallback.
+- **Hosts.** Default `https://ma.manza.finance` (Morocco), South Africa `https://za.manza.finance`, staging and cassettes `https://ma.manza.dev`. Env vars are `MANZA_API_KEY`, `MANZA_BASE_URL`, `MANZA_API_VERSION`; the `ZAZU_*` names are read as a deprecated fallback (one-time `E_USER_DEPRECATED` warning) in 1.x and 2.0. Fixture env vars are `MANZA_FIXTURE_*` with no fallback.
 - **Public API breaks are deliberate.** A break is named in `CHANGELOG.md` and released as a major version, never slipped into a minor.
 - **The error model is shared across the SDK family.** Adding an error kind means coordinating manza-ruby and manza-ts at minimum; `conflict` is one of the eight `ApiException::$kind` values and carries `paymentId` for 409 responses.
-- **Signer.** `TransferAuthorization` must keep reproducing the two fixed vectors in `tests/TransferAuthorizationTest.php` (mirrors manza-ruby's `spec/manza/transfer_authorization_spec.rb`). Never sign the server's `signature_input` blindly: build it from your own record of the draft.
+- **Signer.** `TransferAuthorization` builds the v2 input only (`manza.transfer-authorization.v2|…|client_reference|transfer_method`) and must keep reproducing the three fixed vectors in `tests/TransferAuthorizationTest.php` (mirrors manza-ruby's `spec/manza/transfer_authorization_spec.rb`). Never sign the server's `signature_input_v2` blindly: build it from your own record of the draft. Clients pinned to `Manza-Version: 2026-03-27` are verified v1 and stay on 1.x.
 - **Release.** `bin/release` is byte-identical across the SDK repos and never edited in place. Repo-specific logic lives in `scripts/version` (reads/writes `Client::VERSION`) and `scripts/release-check` (fetch cassettes, composer validate, install, phpunit). `release.yml` fails the release unless the tag equals `Client::VERSION`. Packagist has no trusted publishing and this repo holds no secret: the package syncs from GitHub tags, so the Packagist repository URL must point at `getmanza/manza-php`. Verify it at https://packagist.org/packages/manza/manza-php if versions stop appearing.
 - **The repo moved from `getzazu` to `getmanza`, and from `zazu-php` to `manza-php`.** Remotes and URLs must say `getmanza/manza-php`; the Packagist package is `manza/manza-php` (the old `getzazu/zazu-php` is abandoned in favour of it). The old `Zazu\` namespace is gone; only the `ZAZU_*` env fallback remains.
 - **Snake-case wire format.** API request/response bodies use snake_case. Don't transform them.
@@ -158,7 +160,7 @@ Commands are the ones in `.github/workflows/ci.yml`. CI uses PHP 8.3; local PHP 
 
 ```bash
 # One-time setup
-scripts/fetch-cassettes.sh        # the pinned manza-ruby release (v1.3.0); or scripts/fetch-cassettes.sh v1.2.0
+scripts/fetch-cassettes.sh        # the pinned manza-ruby release (v2.0.0); or scripts/fetch-cassettes.sh v1.2.0
 composer install --no-interaction --prefer-dist
 
 # Daily loop

@@ -98,6 +98,107 @@ final class ResourcesTest extends TestCase
         $client->invoices->get($invoiceId);
     }
 
+    /**
+     * Fixed dates keep the recorded body stable. The API refuses an issue
+     * date in a month before the entity's newest invoice number (the fixture
+     * entity has one in November 2026) or more than a month ahead.
+     */
+    public function testInvoicesCreatePaidIntoTheAccountAskingForAPaymentLink(): void
+    {
+        $client = $this->replayClient('invoices/create');
+
+        $resp = $client->invoices->create([
+            'customer_id' => FixtureIds::id('MANZA_FIXTURE_CUSTOMER_ID'),
+            'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+            'currency_code' => 'MAD',
+            'issue_date' => '2026-11-14',
+            'due_date' => '2026-12-14',
+            'generate_payment_link' => true,
+            'items' => [
+                ['description' => 'SDK fixture line', 'quantity' => 1, 'unit_price' => '100.00'],
+            ],
+        ]);
+
+        $this->assertSame(201, $resp->status);
+        $this->assertTrue($resp->body['generate_payment_link'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'), $resp->body['account']['id'] ?? null);
+    }
+
+    /**
+     * An invoice is paid into one of the entity's accounts: a create without
+     * one is refused as not approvable (`type` "state_error"). An account_id
+     * that is not the entity's is refused with `param` "account_id".
+     */
+    public function testInvoicesCreateWithoutAnAccountIdIsAValidationError(): void
+    {
+        $client = $this->replayClient('invoices/create_without_account');
+
+        try {
+            $client->invoices->create([
+                'customer_id' => FixtureIds::id('MANZA_FIXTURE_CUSTOMER_ID'),
+                'currency_code' => 'MAD',
+                'issue_date' => '2026-05-03',
+                'due_date' => '2026-06-03',
+                'items' => [
+                    ['description' => 'SDK fixture line', 'quantity' => 1, 'unit_price' => '100.00'],
+                ],
+            ]);
+            $this->fail('expected a validation ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertSame('validation', $e->kind);
+            $this->assertSame('state_error', $e->type);
+            // The account refusal, not a date one (also state_error).
+            $this->assertNull($e->param);
+            $this->assertMatchesRegularExpression('/compte bancaire|bank account/i', $e->getMessage());
+        }
+    }
+
+    /** Only a boolean (or "true"/"false"/"1"/"0") is taken: any other text is refused before anything is created. */
+    public function testInvoicesCreateWithANonBooleanGeneratePaymentLinkIsA400(): void
+    {
+        $client = $this->replayClient('invoices/create_invalid_generate_payment_link');
+
+        try {
+            $client->invoices->create([
+                'customer_id' => FixtureIds::id('MANZA_FIXTURE_CUSTOMER_ID'),
+                'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+                'currency_code' => 'MAD',
+                'issue_date' => '2026-05-03',
+                'due_date' => '2026-06-03',
+                'generate_payment_link' => 'yes please',
+                'items' => [
+                    ['description' => 'SDK fixture line', 'quantity' => 1, 'unit_price' => '100.00'],
+                ],
+            ]);
+            $this->fail('expected a validation ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(400, $e->status);
+            $this->assertSame('validation', $e->kind);
+            $this->assertStringContainsString('generate_payment_link', $e->getMessage());
+        }
+    }
+
+    public function testInvoicesUpdate(): void
+    {
+        $client = $this->replayClient('invoices/update');
+
+        $resp = $client->invoices->update(FixtureIds::id('MANZA_FIXTURE_INVOICE_ID'), [
+            'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+            'notes' => 'updated by SDK fixture spec',
+            'generate_payment_link' => true,
+        ]);
+
+        $this->assertSame(200, $resp->status);
+        $this->assertTrue($resp->body['generate_payment_link'] ?? null);
+        $this->assertSame(FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'), $resp->body['account']['id'] ?? null);
+    }
+
+    public function testInvoicesHaveNoCreatePaymentLinkGeneratePaymentLinkOnCreateOrUpdateReplacedIt(): void
+    {
+        $this->assertFalse(method_exists(\Manza\Resources\Invoices::class, 'createPaymentLink'));
+    }
+
     public function testPaymentLinks(): void
     {
         $client = $this->replayClient(
@@ -155,7 +256,7 @@ final class ResourcesTest extends TestCase
         $this->addToAssertionCount(1); // both calls matched their cassette interactions
     }
 
-    public function testPaymentsCreateCarriesClientReference(): void
+    public function testPaymentsCreateCarriesClientReferenceAndTransferMethod(): void
     {
         $client = $this->replayClient('payments/create');
 
@@ -166,6 +267,7 @@ final class ResourcesTest extends TestCase
             'payment_reference' => 'SDK fixture',
             'internal_notes' => '[zazu-ruby-fixture] create spec - do not approve',
             'client_reference' => FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
+            'transfer_method' => 'standard',
         ]);
 
         $this->assertSame(201, $resp->status);
@@ -174,6 +276,7 @@ final class ResourcesTest extends TestCase
             FixtureIds::id('MANZA_FIXTURE_CLIENT_REFERENCE'),
             $resp->body['client_reference'] ?? null,
         );
+        $this->assertSame('standard', $resp->body['transfer_method'] ?? null);
         // Inside the envelope: the challenge went to the authorizer.
         $this->assertSame('pending', $resp->body['authorization']['status'] ?? null);
         $this->assertArrayHasKey('transfer', $resp->body);
@@ -198,6 +301,25 @@ final class ResourcesTest extends TestCase
             $this->assertSame('duplicate_client_reference', $e->type);
             $this->assertSame('client_reference', $e->param);
             $this->assertSame(FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_DRAFT_ID'), $e->paymentId);
+        }
+    }
+
+    public function testPaymentsCreateWithATransferMethodTheMarketDoesNotOfferIsAValidationError(): void
+    {
+        $client = $this->replayClient('payments/create_invalid_transfer_method');
+
+        try {
+            $client->payments->create([
+                'account_id' => FixtureIds::id('MANZA_FIXTURE_ACCOUNT_ID'),
+                'beneficiary_id' => FixtureIds::id('MANZA_FIXTURE_BENEFICIARY_ID'),
+                'amount' => '10.00',
+                'transfer_method' => 'carrier_pigeon',
+            ]);
+            $this->fail('expected a validation ApiException');
+        } catch (ApiException $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertSame('validation', $e->kind);
+            $this->assertSame('transfer_method', $e->param);
         }
     }
 
@@ -273,6 +395,7 @@ final class ResourcesTest extends TestCase
                 externalAccountId: FixtureIds::id('MANZA_FIXTURE_TRUSTED_EXTERNAL_ACCOUNT_ID'),
             ),
             clientReference: FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+            transferMethod: 'standard',
         );
 
         $resp = $client->payments->authorize(
@@ -304,6 +427,7 @@ final class ResourcesTest extends TestCase
                 externalAccountId: FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'),
             ),
             clientReference: FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_CLIENT_REFERENCE'),
+            transferMethod: 'standard',
         );
 
         $resp = $client->payments->authorize(
@@ -462,5 +586,8 @@ final class ResourcesTest extends TestCase
         foreach (['per_transfer_limit', 'daily_limit', 'daily_authorized_total', 'secret_expires_at', 'webhook_endpoint_id', 'enrolled_at'] as $key) {
             $this->assertArrayHasKey($key, $resp->body);
         }
+        // "Approve transfers to new payees" is on for the fixture entity (setup step 6).
+        $this->assertTrue($resp->body['trust_new_payees'] ?? null);
+        $this->assertIsString($resp->body['new_payee_limit'] ?? null);
     }
 }

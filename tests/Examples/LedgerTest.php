@@ -29,8 +29,8 @@ final class LedgerTest extends TestCase
     public function testRecordsAndFindsEntries(): void
     {
         $ledger = new Ledger($this->path);
-        $ledger->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
-        $ledger->record('po_2', paymentId: 'p2', amount: '2.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:y');
+        $ledger->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x', transferMethod: 'standard');
+        $ledger->record('po_2', paymentId: 'p2', amount: '2.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:y', transferMethod: null);
 
         $this->assertSame('p1', $ledger->find('po_1')['payment_id'] ?? null);
         $this->assertSame('p2', $ledger->find('po_2')['payment_id'] ?? null);
@@ -43,7 +43,7 @@ final class LedgerTest extends TestCase
             file_put_contents($this->path, $json);
 
             try {
-                (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
+                (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x', transferMethod: 'standard');
                 $this->fail("expected a RuntimeException for {$json}");
             } catch (\RuntimeException $e) {
                 $this->assertStringContainsString('not a ledger', $e->getMessage());
@@ -54,7 +54,7 @@ final class LedgerTest extends TestCase
 
     public function testWritesTheLedgerReadableByItsOwnerOnly(): void
     {
-        (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
+        (new Ledger($this->path))->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x', transferMethod: 'standard');
 
         $this->assertSame(0o600, fileperms($this->path) & 0o777);
         $this->assertSame([], glob("{$this->path}.*.tmp") ?: [], 'no temporary file is left behind');
@@ -63,7 +63,7 @@ final class LedgerTest extends TestCase
     public function testRefusesToOverwriteALedgerItCannotRead(): void
     {
         $ledger = new Ledger($this->path);
-        $ledger->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x');
+        $ledger->record('po_1', paymentId: 'p1', amount: '1.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:x', transferMethod: 'standard');
         chmod($this->path, 0o000);
         clearstatcache(true, $this->path);
         if (is_readable($this->path)) {
@@ -72,7 +72,7 @@ final class LedgerTest extends TestCase
         }
 
         try {
-            $ledger->record('po_2', paymentId: 'p2', amount: '2.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:y');
+            $ledger->record('po_2', paymentId: 'p2', amount: '2.0', currencyCode: 'MAD', accountId: 'a', payee: 'ext:y', transferMethod: null);
             $this->fail('expected a RuntimeException');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('cannot read', $e->getMessage());
