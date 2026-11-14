@@ -33,8 +33,8 @@ final class TransferAuthorizationTest extends TestCase
             currencyCode: 'MAD',
             accountId: self::ACCOUNT_ID,
             payee: TransferAuthorization::payeeFor(externalAccountId: '0199a1b2-0000-7000-8000-000000000003'),
-            transferMethod: 'eft',
             clientReference: 'po_1',
+            transferMethod: 'eft',
         );
 
         $this->assertSame(
@@ -57,8 +57,8 @@ final class TransferAuthorizationTest extends TestCase
             currencyCode: 'MAD',
             accountId: self::ACCOUNT_ID,
             payee: TransferAuthorization::payeeFor(externalAccountId: '0199a1b2-0000-7000-8000-000000000003'),
-            transferMethod: null,
             clientReference: 'po_1',
+            transferMethod: null,
         );
 
         $this->assertStringEndsWith('|ext:0199a1b2-0000-7000-8000-000000000003|po_1|', $input);
@@ -77,6 +77,7 @@ final class TransferAuthorizationTest extends TestCase
             currencyCode: 'MAD',
             accountId: self::ACCOUNT_ID,
             payee: TransferAuthorization::payeeFor(destinationAccountId: '0199a1b2-0000-7000-8000-000000000004'),
+            clientReference: null,
             transferMethod: null,
         );
 
@@ -99,6 +100,7 @@ final class TransferAuthorizationTest extends TestCase
             currencyCode: 'MAD',
             accountId: self::ACCOUNT_ID,
             payee: 'ext:x',
+            clientReference: null,
             transferMethod: null,
         );
     }
@@ -118,6 +120,23 @@ final class TransferAuthorizationTest extends TestCase
             currencyCode: 'MAD',
             accountId: self::ACCOUNT_ID,
             payee: 'ext:x',
+            clientReference: 'po_1',
+        );
+    }
+
+    /** A 1.x positional call (clientReference seventh) must not sign `…|payee||po_1`. */
+    public function testRefusesA1xPositionalCallThatPassesTheClientReferenceSeventh(): void
+    {
+        $this->expectException(\ArgumentCountError::class);
+
+        TransferAuthorization::signatureInput( // @phpstan-ignore arguments.count
+            self::PAYMENT_ID,
+            self::NONCE,
+            '2500.0',
+            'MAD',
+            self::ACCOUNT_ID,
+            'ext:x',
+            'po_1',
         );
     }
 

@@ -19,7 +19,7 @@ namespace Manza;
  *         paymentId: $draft['id'], nonce: $nonce, amount: $draft['amount'],
  *         currencyCode: $draft['currency_code'], accountId: $draft['account_id'],
  *         payee: TransferAuthorization::payeeFor(externalAccountId: $draft['external_account_id']),
- *         transferMethod: $draft['transfer_method'], clientReference: $draft['client_reference'],
+ *         clientReference: $draft['client_reference'], transferMethod: $draft['transfer_method'],
  *     );
  *     $signature = TransferAuthorization::sign($signingSecret, $input);
  *     $authorizer->payments->authorize($draft['id'], $authorizationId, $signature);
@@ -38,10 +38,12 @@ final class TransferAuthorization
 
     /**
      * `$amount` must be the API's decimal string verbatim (e.g. "2500.0").
-     * `$transferMethod` is the payment's rail as the API stores it (the
-     * create response's `transfer_method`): required, and null (signed as
-     * an empty segment) where the market offers no choice.
-     * `$clientReference` is empty when the transfer has none.
+     * `$clientReference` is null (signed as an empty segment) when the
+     * transfer has none. `$transferMethod` is the payment's rail as the API
+     * stores it (the create response's `transfer_method`), null (an empty
+     * segment) where the market offers no choice. Both are required, in
+     * wire order, so a 1.x call that passed `$clientReference` seventh
+     * fails with an \ArgumentCountError instead of signing a wrong input.
      *
      * @throws \InvalidArgumentException when $amount is not a string
      */
@@ -52,8 +54,8 @@ final class TransferAuthorization
         string $currencyCode,
         string $accountId,
         string $payee,
+        ?string $clientReference,
         ?string $transferMethod,
-        ?string $clientReference = null,
     ): string {
         if (!\is_string($amount)) {
             throw new \InvalidArgumentException(

@@ -394,8 +394,8 @@ final class ResourcesTest extends TestCase
             payee: TransferAuthorization::payeeFor(
                 externalAccountId: FixtureIds::id('MANZA_FIXTURE_TRUSTED_EXTERNAL_ACCOUNT_ID'),
             ),
-            transferMethod: 'standard',
             clientReference: FixtureIds::id('MANZA_FIXTURE_AUTHORIZABLE_CLIENT_REFERENCE'),
+            transferMethod: 'standard',
         );
 
         $resp = $client->payments->authorize(
@@ -426,8 +426,8 @@ final class ResourcesTest extends TestCase
             payee: TransferAuthorization::payeeFor(
                 externalAccountId: FixtureIds::id('MANZA_FIXTURE_EXTERNAL_ACCOUNT_ID'),
             ),
-            transferMethod: 'standard',
             clientReference: FixtureIds::id('MANZA_FIXTURE_NEW_PAYEE_CLIENT_REFERENCE'),
+            transferMethod: 'standard',
         );
 
         $resp = $client->payments->authorize(

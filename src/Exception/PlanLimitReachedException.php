@@ -23,6 +23,7 @@ final class PlanLimitReachedException extends ApiException
     public function __construct(
         int $status,
         string $message,
+        ?string $param,
         ?string $requestId,
         array $body,
         public readonly ?string $limitKind,
@@ -34,7 +35,7 @@ final class PlanLimitReachedException extends ApiException
             kind: 'validation',
             type: 'plan_limit_reached',
             message: $message,
-            param: null,
+            param: $param,
             requestId: $requestId,
             retryAfter: null,
             body: $body,

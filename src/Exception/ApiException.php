@@ -91,6 +91,7 @@ class ApiException extends \RuntimeException
             return new PlanLimitReachedException(
                 status: $status,
                 message: $message,
+                param: $param,
                 requestId: $requestId,
                 body: $body,
                 limitKind: \is_string($payload['kind'] ?? null) ? $payload['kind'] : null,

@@ -124,8 +124,8 @@ $input = TransferAuthorization::signatureInput(
     currencyCode: $draft['currency_code'],
     accountId: $draft['account_id'],
     payee: TransferAuthorization::payeeFor(externalAccountId: $draft['external_account_id']),
-    transferMethod: $draft['transfer_method'],   // required; null signs as ""
     clientReference: $draft['client_reference'],
+    transferMethod: $draft['transfer_method'],   // required; null signs as ""
 );
 $signature = TransferAuthorization::sign($signingSecret, $input);
 

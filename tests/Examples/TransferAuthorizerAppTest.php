@@ -121,8 +121,8 @@ final class TransferAuthorizerAppTest extends TestCase
             currencyCode: 'ZAR',
             accountId: '01958e51-7c5a-7000-8000-000000000013',
             payee: 'ext:01958e51-7c5a-7000-8000-000000000014',
-            transferMethod: 'eft',
             clientReference: 'po_8812',
+            transferMethod: 'eft',
         );
     }
 

@@ -234,8 +234,8 @@ final class App
             currencyCode: (string) $entry['currency_code'],
             accountId: (string) $entry['account_id'],
             payee: (string) $entry['payee'],
-            transferMethod: \is_string($entry['transfer_method'] ?? null) ? $entry['transfer_method'] : null,
             clientReference: $clientReference,
+            transferMethod: \is_string($entry['transfer_method'] ?? null) ? $entry['transfer_method'] : null,
         );
         // A signature over a different input is sure to fail, and failed
         // attempts count toward suspending the authorizer. Leave the challenge

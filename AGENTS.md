@@ -42,7 +42,7 @@ $event = Webhook::constructEvent($rawBody, $_SERVER, $secret);   // Webhook::ver
 
 // Machine authorization (v2): sign from your own record, never from the server's signature_input_v2
 $input = TransferAuthorization::signatureInput(paymentId: ..., nonce: ..., amount: ..., currencyCode: ..., accountId: ...,
-    payee: TransferAuthorization::payeeFor(externalAccountId: ...), transferMethod: ..., clientReference: ...);
+    payee: TransferAuthorization::payeeFor(externalAccountId: ...), clientReference: ..., transferMethod: ...);
 $signature = TransferAuthorization::sign($secret, $input);   // lowercase hex HMAC-SHA256
 $manza->payments->authorize($draftId, $authorizationId, $signature);  // blank signature -> \InvalidArgumentException
 $manza->payments->decline($draftId, $authorizationId, 'reason');      // reason optional
@@ -57,7 +57,7 @@ Resources: `accounts`, `beneficiaries`, `checkoutSessions`, `customers`, `entity
 `examples/transfer_authorizer/` is a runnable authorizer (`php -S`), creator and preflight; its classes load through an `autoload-dev` entry and `.gitattributes` keeps it out of the package. Its tests live in `tests/Examples/`.
 
 - `Manza\Page`: cursor-based pagination (`data`, `hasMore`, `nextCursor`, `next()`), hard cap of 100 per page (`Page::MAX_PER_PAGE`)
-- Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Its one subclass, `PlanLimitReachedException` (since 2.0), is a 422 `type` `plan_limit_reached` of kind `validation` carrying `limitKind` (the API's `kind`, renamed because `$kind` is the discriminator), `current` and `max`. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
+- Errors: **one** class, `Manza\Exception\ApiException`, discriminated by `$e->kind`, never by status code. Its one subclass, `PlanLimitReachedException` (since 2.0), is a 422 `type` `plan_limit_reached` of kind `validation` carrying `limitKind` (the API's `kind`, renamed because `$kind` is the discriminator), `current` and `max`. Eight kinds (with `ConnectionException` and `ConfigurationException` that makes the family's ten; the `PlanLimitReachedException` subclass above is the eleventh): `authentication` (401), `forbidden` (403), `not_found` (404), `validation` (400, 422), `conflict` (409, carries `paymentId`), `rate_limit` (429, carries `retryAfter`), `server` (5xx), `api` (anything else). Transport failures throw `ConnectionException`, bad configuration throws `ConfigurationException`.
 - Snake-case wire format: responses are associative arrays with the API's keys, no typed models. **No auto-camelCasing.**
 
 ## How to work in this codebase
