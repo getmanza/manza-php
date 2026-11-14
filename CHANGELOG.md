@@ -42,7 +42,7 @@ Synced to the Manza API at getmanza/app `906ec486e5` (API version `2026-11-13`).
 - **`account_id` is required on invoice create.** Pass the account the invoice is paid into (`$client->accounts->list()`); 1.x calls without it now throw a `validation` `ApiException` (422 `state_error`)
 - **v2 signatures only.** Add `transferMethod: $payment['transfer_method']` to every `TransferAuthorization::signatureInput()` call (and `clientReference: null` where you left it out), and compare with the webhook's `signature_input_v2` instead of `signature_input`. A client pinned to `Manza-Version: 2026-03-27` (`apiVersion:` or `MANZA_API_VERSION`) is verified v1 and must stay on manza-php 1.x; unpin it, or pin `2026-11-13`, to move to 2.0
 - **Plan caps.** A `catch` that tells server errors apart by `$e->kind === 'server'` around creates that may hit a plan cap no longer sees one: catch `PlanLimitReachedException` (or check `kind` `validation`), and do not retry it
-- **Still working in 2.0.** The legacy `ZAZU_*` env fallback and the deprecated `$client->transferDrafts` alias are kept in 2.0 (with their deprecation warnings); move to `MANZA_*` and `$client->payments` at your own pace
+- **Still working in 2.0.** The legacy `ZAZU_*` env fallback and the deprecated `$client->transferDrafts` alias are kept in 2.0 (the env fallback still warns once per variable; the alias is deprecated in its docblock only); move to `MANZA_*` and `$client->payments` at your own pace
 - The example's `Ledger::record()` takes a required `transferMethod`; see `examples/transfer_authorizer/README.md` for ledger entries written by the 1.x example
 
 ## [1.1.0]
